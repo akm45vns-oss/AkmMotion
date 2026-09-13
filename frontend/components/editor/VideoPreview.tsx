@@ -47,6 +47,7 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
   } = useEditorStore();
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [imageError, setImageError] = useState(false);
 
   const activeScene =
@@ -124,8 +125,14 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
 
   const playSceneVoice = useCallback(
     (sceneIdx: number) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-      window.speechSynthesis.cancel();
+      // 1. Cancel previous audio & browser speech
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
       resetKaraoke();
 
       const scene = scenes[sceneIdx];
@@ -137,7 +144,6 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
         .trim();
 
       if (!cleanText) {
-        // Skip empty scene
         if (sceneIdx + 1 < scenes.length) {
           setActiveSceneIndex(sceneIdx + 1);
           setActiveSceneId(scenes[sceneIdx + 1].id);
@@ -148,37 +154,40 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
         return;
       }
 
+      // Initial word timings estimate
       const estimatedDuration = scene.duration || cleanText.split(" ").length / 2.1;
-      const timings = buildWordTimings(cleanText, estimatedDuration);
+      let timings = buildWordTimings(cleanText, estimatedDuration);
       setWordTimings(timings);
 
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+      // 2. Play exact Edge Neural TTS audio from backend
+      const ttsUrl = `http://localhost:8000/api/v1/ai/tts?text=${encodeURIComponent(cleanText)}&language=${voiceLang}&gender=${voiceGender}`;
+      const audio = new Audio(ttsUrl);
+      audioRef.current = audio;
 
-      // Language & voice selection
-      utterance.lang = voiceLang === "hi" ? "hi-IN" : "en-IN";
-      utterance.rate  = voiceLang === "hi" ? 0.9 : 0.95;
-      utterance.pitch = 1.0;
+      let timingsUpdated = false;
 
-      const voice = pickVoice(voiceLang, voiceGender);
-      if (voice) utterance.voice = voice;
-
-      // ── Karaoke word boundary sync ──────────────────────────────────────
-      utterance.onboundary = (event) => {
-        if (event.name !== "word") return;
-        const charIdx = event.charIndex;
-        // Find which word starts at this charIndex
-        const words = cleanText.split(/\s+/);
-        let pos = 0;
-        for (let i = 0; i < words.length; i++) {
-          if (pos >= charIdx) {
-            setCurrentWordIndex(i);
-            break;
-          }
-          pos += words[i].length + 1;
+      audio.onloadedmetadata = () => {
+        if (audio.duration && audio.duration > 0) {
+          timings = buildWordTimings(cleanText, audio.duration);
+          setWordTimings(timings);
+          timingsUpdated = true;
         }
       };
 
-      utterance.onend = () => {
+      audio.ontimeupdate = () => {
+        const cur = audio.currentTime;
+        if (!timingsUpdated && audio.duration && audio.duration > 0) {
+          timings = buildWordTimings(cleanText, audio.duration);
+          setWordTimings(timings);
+          timingsUpdated = true;
+        }
+        const activeIdx = timings.findIndex((t) => cur >= t.start && cur <= t.end);
+        if (activeIdx >= 0) {
+          setCurrentWordIndex(activeIdx);
+        }
+      };
+
+      audio.onended = () => {
         resetKaraoke();
         if (sceneIdx + 1 < scenes.length) {
           setActiveSceneIndex(sceneIdx + 1);
@@ -189,8 +198,31 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
         }
       };
 
-      utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
+      audio.onerror = () => {
+        // Fallback to local SpeechSynthesis if backend is temporarily unreachable
+        if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = voiceLang === "hi" ? "hi-IN" : "en-IN";
+        utterance.rate = voiceLang === "hi" ? 0.9 : 0.95;
+        const voice = pickVoice(voiceLang, voiceGender);
+        if (voice) utterance.voice = voice;
+        utterance.onend = () => {
+          resetKaraoke();
+          if (sceneIdx + 1 < scenes.length) {
+            setActiveSceneIndex(sceneIdx + 1);
+            setActiveSceneId(scenes[sceneIdx + 1]?.id);
+            playSceneVoice(sceneIdx + 1);
+          } else {
+            setIsPlaying(false);
+          }
+        };
+        utteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+      };
+
+      audio.play().catch((err) => {
+        console.warn("Audio playback interrupted or blocked:", err);
+      });
     },
     [scenes, voiceLang, voiceGender, buildWordTimings, pickVoice, setWordTimings, setCurrentWordIndex, resetKaraoke, setIsPlaying, setActiveSceneIndex, setActiveSceneId]
   );
@@ -201,6 +233,10 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
     if (next) {
       playSceneVoice(activeSceneIndex);
     } else {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
@@ -209,10 +245,11 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
   };
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
     return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }

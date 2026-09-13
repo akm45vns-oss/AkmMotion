@@ -65,13 +65,14 @@ async def generate_ai_pipeline(
 @router.post("/tts")
 async def generate_speech(payload: dict = Body(...)):
     """
-    Synthesizes Indian-accent speech (gTTS) for a given text.
-    Accepts: { text, language?, gender? }
+    Synthesizes studio-grade neural speech audio (Edge TTS / OpenAI / gTTS) for a given text.
+    Accepts: { text, language?, gender?, voice? }
     Returns: MP3 audio bytes (audio/mpeg).
     """
     raw_text = payload.get("text", "").strip()
     language = payload.get("language", "en")  # 'en' or 'hi'
     gender   = payload.get("gender", "male")  # 'male' or 'female'
+    voice    = payload.get("voice", None)
 
     # Clean text: keep letters, digits, spaces, punctuation and Devanagari
     text = re.sub(r"[^\w\s.,?!'\-\u0900-\u097F]", "", raw_text).strip()
@@ -85,15 +86,14 @@ async def generate_speech(payload: dict = Body(...)):
 
     try:
         voice_svc = VoiceGeneratorService()
-        # Run blocking gTTS network call in a thread pool (non-blocking for event loop)
-        loop = asyncio.get_event_loop()
-        audio_bytes = await loop.run_in_executor(
-            None,
-            partial(voice_svc.synthesize_to_bytes, text, language, gender)
+        audio_bytes = await voice_svc.synthesize_async(
+            text=text,
+            language=language,
+            gender=gender,
+            voice=voice
         )
 
         if not audio_bytes:
-            # Return minimal silent MP3 instead of 500 so render doesn't break
             return Response(
                 content=_silent_mp3(),
                 media_type="audio/mpeg",
@@ -103,17 +103,30 @@ async def generate_speech(payload: dict = Body(...)):
         return Response(
             content=audio_bytes,
             media_type="audio/mpeg",
-            headers={"Content-Length": str(len(audio_bytes))}
+            headers={
+                "Content-Length": str(len(audio_bytes)),
+                "Cache-Control": "public, max-age=86400"
+            }
         )
     except Exception as e:
         print(f"[TTS Endpoint] Error: {e}")
         import traceback; traceback.print_exc()
-        # Never return 500 to the render engine — silent fallback keeps video rendering
         return Response(
             content=_silent_mp3(),
             media_type="audio/mpeg",
             headers={"X-TTS-Error": str(e)[:120]}
         )
+
+
+@router.get("/tts")
+async def generate_speech_get(
+    text: str,
+    language: str = "en",
+    gender: str = "male",
+    voice: Optional[str] = None
+):
+    """GET endpoint for HTML5 Audio element streaming."""
+    return await generate_speech({"text": text, "language": language, "gender": gender, "voice": voice})
 
 
 def _silent_mp3() -> bytes:

@@ -20,9 +20,9 @@
 ## Last Updated
 
 - Date: 2026-09-13
-- Time: 15:46 IST
+- Time: 16:01 IST
 - By: Antigravity AI
-- Session Summary: Configured comprehensive .gitignore to safeguard environment secrets (.env), node_modules, and build outputs. Fixed form submission bug on Auto Improve button. Prepared and pushed full AkmMotion project codebase to GitHub repository `origin/main`.
+- Session Summary: Resolved voice mismatch between video preview and rendered video. Upgraded backend VoiceGeneratorService to use Microsoft Edge Neural TTS (`en-IN-PrabhatNeural`, `en-IN-NeerjaNeural`, `hi-IN-SwaraNeural`, `hi-IN-MadhurNeural`) with in-memory caching and gTTS/OpenAI fallbacks. Synchronized `VideoPreview.tsx` to play the exact same backend neural audio instead of browser SpeechSynthesis, ensuring preview and downloaded video voices are 100% identical and studio-grade.
 
 ---
 
@@ -78,4 +78,4 @@ PROJECT d0331de9-c81e-47d7-8d38-ba8a0682b07f SCENES COUNT: 6
 
 ---
 
-*End of brain.md — Last updated: 2026-09-13 15:46 IST*
+*End of brain.md — Last updated: 2026-09-13 16:01 IST*
