@@ -55,6 +55,8 @@ class ProjectService:
             language=data.language,
             script_content=data.script_content
         )
+        # Re-fetch with eager-loaded script to avoid async lazy-load crash
+        project = await self.repo.get_by_id(project.id, user_uuid)
         return ProjectResponse.from_project(project)
 
     async def update_project(self, project_id: UUID, data: ProjectUpdate, user_id_str: str) -> ProjectResponse:
