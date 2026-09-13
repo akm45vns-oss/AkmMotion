@@ -1,4 +1,4 @@
-﻿from typing import Optional, List
+from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,24 @@ class RenderRepository:
         query = select(RenderJob).where(RenderJob.id == job_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_active_job(self, project_id: UUID, user_id: UUID) -> Optional[RenderJob]:
+        query = (
+            select(RenderJob)
+            .where(
+                RenderJob.project_id == project_id,
+                RenderJob.user_id == user_id,
+                RenderJob.status.in_([RenderStatus.pending, RenderStatus.processing])
+            )
+            .order_by(RenderJob.created_at.desc())
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
+    async def get_video_by_job(self, job_id: UUID) -> Optional[Video]:
+        query = select(Video).where(Video.render_job_id == job_id).order_by(Video.created_at.desc())
+        result = await self.db.execute(query)
+        return result.scalars().first()
 
     async def get_by_project(self, project_id: UUID, user_id: UUID) -> List[RenderJob]:
         query = (
@@ -31,7 +49,7 @@ class RenderRepository:
             status=RenderStatus.pending,
             progress=0,
             estimated_seconds=estimated_seconds,
-            started_at=datetime.now(timezone.utc)
+            started_at=None
         )
         self.db.add(job)
         await self.db.commit()
@@ -46,7 +64,9 @@ class RenderRepository:
         job.progress = progress
         if status:
             job.status = status
-            if status in [RenderStatus.completed, RenderStatus.failed, RenderStatus.cancelled]:
+            if status == RenderStatus.processing and not job.started_at:
+                job.started_at = datetime.now(timezone.utc)
+            elif status in [RenderStatus.completed, RenderStatus.failed, RenderStatus.cancelled]:
                 job.completed_at = datetime.now(timezone.utc)
         if error_message:
             job.error_message = error_message

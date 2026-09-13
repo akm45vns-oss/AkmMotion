@@ -1,4 +1,4 @@
-﻿import { apiClient } from "./client";
+import { apiClient } from "./client";
 
 export interface RenderJob {
   id: string;
@@ -8,6 +8,7 @@ export interface RenderJob {
   progress: number;
   error_message?: string;
   estimated_seconds?: number;
+  video_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -21,5 +22,9 @@ export const renderApi = {
   getStatus: async (jobId: string): Promise<RenderJob> => {
     const response = await apiClient.get<RenderJob>(`/render/status/${jobId}`);
     return response.data;
+  },
+
+  getVideoUrl: (jobId: string): string => {
+    return `${apiClient.defaults.baseURL || ""}/render/video/${jobId}`;
   },
 };

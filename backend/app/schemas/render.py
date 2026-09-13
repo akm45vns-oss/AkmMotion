@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
@@ -22,6 +22,7 @@ class RenderJobResponse(BaseModel):
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
     estimated_seconds: Optional[int] = None
+    video_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

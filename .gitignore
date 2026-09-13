@@ -45,6 +45,8 @@ dist/
 .pytest_cache/
 .coverage
 test_voice.mp3
+storage/
+backend/storage/
 
 # Editor and OS files
 .vscode/

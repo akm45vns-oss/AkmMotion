@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     # Rendering Executables
     FFMPEG_PATH: str = "ffmpeg"
     REMOTION_PATH: str = "npx remotion"
+    STORAGE_DIR: str = ""
+
+    @property
+    def video_storage_dir(self) -> str:
+        if self.STORAGE_DIR:
+            path = os.path.join(self.STORAGE_DIR, "videos")
+        else:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            path = os.path.join(base_dir, "storage", "videos")
+        os.makedirs(path, exist_ok=True)
+        return path
 
     model_config = SettingsConfigDict(
         env_file=".env",
