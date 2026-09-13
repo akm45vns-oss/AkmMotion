@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sparkles, CheckCircle2, AlertCircle, Zap, ShieldCheck, FileText, Globe, Clock, Layers } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api/client";
 
 interface HealthScoreCardProps {
   scriptText: string;
@@ -24,7 +25,7 @@ export default function HealthScoreCard({ scriptText, language, onAutoImproveCli
 
       setLoading(true);
       try {
-        const res = await fetch("http://localhost:8000/api/v1/ai/analyze-script", {
+        const res = await fetch(`${API_BASE_URL}/ai/analyze-script`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ script: scriptText, language }),

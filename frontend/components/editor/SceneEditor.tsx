@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import HealthScoreCard from "@/components/editor/HealthScoreCard";
 import AutoImproveModal from "@/components/editor/AutoImproveModal";
+import { API_BASE_URL } from "@/lib/api/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type SubtitleStyle = "yellow-cyan" | "karaoke" | "minimal";
@@ -108,7 +109,7 @@ export default function SceneEditor() {
     setRegenLoading(true);
     setRegenSuccess(false);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/ai/regenerate-scene-image", {
+      const res = await fetch(`${API_BASE_URL}/ai/regenerate-scene-image`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}` },
         body: JSON.stringify({
@@ -139,7 +140,7 @@ export default function SceneEditor() {
       if (!activeScene) return;
       setEnhanceLoading(true);
       try {
-        const res = await fetch("http://localhost:8000/api/v1/ai/generate-scene-prompt", {
+        const res = await fetch(`${API_BASE_URL}/ai/generate-scene-prompt`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

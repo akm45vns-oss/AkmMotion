@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useEditorStore } from "@/lib/stores/editorStore";
 import { Play, Pause, Volume2, Sparkles, Film, Mic2, Monitor, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { API_BASE_URL } from "@/lib/api/client";
 
 // ─── Fallback images ─────────────────────────────────────────────────────────
 const UNSPLASH_FALLBACKS = [
@@ -160,7 +161,7 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
       setWordTimings(timings);
 
       // 2. Play exact Edge Neural TTS audio from backend
-      const ttsUrl = `http://localhost:8000/api/v1/ai/tts?text=${encodeURIComponent(cleanText)}&language=${voiceLang}&gender=${voiceGender}`;
+      const ttsUrl = `${API_BASE_URL}/ai/tts?text=${encodeURIComponent(cleanText)}&language=${voiceLang}&gender=${voiceGender}`;
       const audio = new Audio(ttsUrl);
       audioRef.current = audio;
 

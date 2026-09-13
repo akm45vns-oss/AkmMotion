@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useEditorStore } from "@/lib/stores/editorStore";
 import { Download, CheckCircle2, AlertCircle, X, Film, Volume2, Sparkles } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api/client";
 
 // ─── Word timing helper (mirrors backend logic) ───────────────────────────────
 function computeWordTimings(text: string, duration: number) {
@@ -49,7 +50,7 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
 
   const fetchIndianTTSAudio = async (text: string, audioCtx: AudioContext): Promise<AudioBuffer | null> => {
     try {
-      const response = await fetch("http://localhost:8000/api/v1/ai/tts", {
+      const response = await fetch(`${API_BASE_URL}/ai/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, language: voiceLang, gender: voiceGender }),

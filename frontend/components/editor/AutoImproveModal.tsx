@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Sparkles, Check, RotateCcw, ArrowRight, ShieldCheck } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api/client";
 
 interface AutoImproveModalProps {
   originalScript: string;
@@ -17,7 +18,7 @@ export default function AutoImproveModal({ originalScript, onAccept, onClose }: 
     const fetchImprovement = async () => {
       setLoading(true);
       try {
-        const res = await fetch("http://localhost:8000/api/v1/ai/improve-script", {
+        const res = await fetch(`${API_BASE_URL}/ai/improve-script`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ script: originalScript }),
