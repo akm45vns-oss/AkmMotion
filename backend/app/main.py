@@ -21,13 +21,25 @@ app = FastAPI(
 )
 
 # Set up CORS
+# Build origins list: always include localhost + any extra origins from env
+_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://akm-motion.vercel.app",
+]
+# Append any additional origins from the ALLOWED_ORIGINS env variable
+for _o in settings.cors_origins:
+    if _o not in _cors_origins:
+        _cors_origins.append(_o)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=_cors_origins,
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include API v1 Router
