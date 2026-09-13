@@ -1,4 +1,4 @@
-﻿from uuid import UUID
+from uuid import UUID
 from typing import Optional, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
@@ -55,15 +55,6 @@ class ProjectService:
             language=data.language,
             script_content=data.script_content
         )
-
-        # Automatically execute AI Pipeline to generate 6 scenes & assets!
-        try:
-            from app.services.ai_pipeline_service import AIPipelineService
-            pipeline = AIPipelineService(self.repo.db)
-            await pipeline.run_pipeline(project.id, user_uuid)
-        except Exception as e:
-            print(f"[ProjectService] Automatic AI Pipeline execution notice: {e}")
-
         return ProjectResponse.from_project(project)
 
     async def update_project(self, project_id: UUID, data: ProjectUpdate, user_id_str: str) -> ProjectResponse:
