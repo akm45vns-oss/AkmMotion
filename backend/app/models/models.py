@@ -1,4 +1,4 @@
-﻿import enum
+import enum
 from datetime import datetime
 from sqlalchemy import (
     Column, String, Text, Integer, Float, BigInteger, Boolean, DateTime,
@@ -405,12 +405,6 @@ class ActivityLog(Base):
     ip_address = Column(INET, nullable=True)
 
 
-# 18. Character
-class Character(Base):
-    __tablename__ = "characters"
+# 18. Character (CME canonical model)
+from app.models.character import DBCharacter as Character
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    avatar_url = Column(Text, nullable=True)
-    style_prompt = Column(Text, nullable=True)

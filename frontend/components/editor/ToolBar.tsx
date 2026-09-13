@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEditorStore } from "@/lib/stores/editorStore";
 import { ArrowLeft, Play, Download, Sparkles, Wand2 } from "lucide-react";
@@ -6,10 +6,12 @@ import Link from "next/link";
 
 interface ToolBarProps {
   onRenderClick: () => void;
+  onGenerateClick?: () => void;
+  isGenerating?: boolean;
 }
 
-export default function ToolBar({ onRenderClick }: ToolBarProps) {
-  const { project, isPlaying, setIsPlaying } = useEditorStore();
+export default function ToolBar({ onRenderClick, onGenerateClick, isGenerating = false }: ToolBarProps) {
+  const { project, scenes, isPlaying, setIsPlaying } = useEditorStore();
 
   return (
     <header className="h-16 border-b border-gray-800 bg-[#0D1322] px-6 flex items-center justify-between">
@@ -32,9 +34,21 @@ export default function ToolBar({ onRenderClick }: ToolBarProps) {
       </div>
 
       <div className="flex items-center gap-3">
+        {onGenerateClick && (
+          <button
+            onClick={onGenerateClick}
+            disabled={isGenerating}
+            className="px-3.5 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50"
+          >
+            <Sparkles className={`w-3.5 h-3.5 text-indigo-400 ${isGenerating ? "animate-spin" : ""}`} />
+            {isGenerating ? "Generating Scenes..." : (scenes.length > 0 ? "Regenerate Scenes" : "Generate Scenes")}
+          </button>
+        )}
+
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold flex items-center gap-2 transition-all"
+          disabled={scenes.length === 0}
+          className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-40"
         >
           <Play className={`w-3.5 h-3.5 ${isPlaying ? "fill-white" : ""}`} />
           {isPlaying ? "Pause Preview" : "Play Timeline"}
@@ -42,7 +56,8 @@ export default function ToolBar({ onRenderClick }: ToolBarProps) {
 
         <button
           onClick={onRenderClick}
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-90 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 flex items-center gap-2 transition-all"
+          disabled={scenes.length === 0}
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-90 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 flex items-center gap-2 transition-all disabled:opacity-40"
         >
           <Wand2 className="w-4 h-4" />
           Render Final Video

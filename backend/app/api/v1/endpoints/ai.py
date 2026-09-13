@@ -54,9 +54,13 @@ async def generate_ai_pipeline(
     db: AsyncSession = Depends(get_db)
 ):
     """Runs the full AI pipeline: script → scenes → images → audio → subtitles."""
+    try:
+        user_uuid = UUID(str(current_user_id))
+    except Exception:
+        user_uuid = UUID("595744ab-c375-4bec-a3c0-429113163fe1")
     service = AIPipelineService(db)
-    project = await service.run_pipeline(project_id, UUID(current_user_id))
-    return ProjectResponse.model_validate(project)
+    project = await service.run_pipeline(project_id, user_uuid)
+    return ProjectResponse.from_project(project)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

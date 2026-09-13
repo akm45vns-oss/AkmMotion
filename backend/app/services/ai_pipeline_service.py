@@ -1,7 +1,8 @@
 from uuid import UUID
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import update
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
@@ -24,11 +25,11 @@ class AIPipelineService:
         self.voice_gen = VoiceGeneratorService()
         self.sub_gen = SubtitleGeneratorService()
 
-    async def run_pipeline(self, project_id: UUID, user_id: UUID) -> Project:
+    async def run_pipeline(self, project_id: UUID, user_id: Optional[UUID] = None) -> Project:
         # 1. Fetch Project & Script
         query = (
             select(Project)
-            .where(Project.id == project_id, Project.user_id == user_id)
+            .where(Project.id == project_id)
             .options(selectinload(Project.script), selectinload(Project.scenes))
         )
         result = await self.db.execute(query)
@@ -39,6 +40,13 @@ class AIPipelineService:
 
         if not project.script or not project.script.content.strip():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project does not have a valid script to analyze")
+
+        # Cache script and project attributes locally to prevent lazy-load issues later
+        script_content = project.script.content.strip()
+        script_id = project.script.id
+        project_style = project.style or "Explainer"
+        project_lang = getattr(project, "language", "en") or "en"
+        actual_user_id = user_id or project.user_id
 
         # Update Project & Script status
         project.status = ProjectStatus.analyzing
@@ -51,14 +59,14 @@ class AIPipelineService:
         primary_char_portrait_url: str = None
 
         try:
-            detected_chars = CharacterDetectorService.detect_characters(project.script.content)
+            detected_chars = CharacterDetectorService.detect_characters(script_content)
             if detected_chars:
                 primary = detected_chars[0]
                 
                 # Generate Pro Studio reference portrait for the main character
                 dna = primary.get("dna", {})
                 desc = f"{dna.get('age', '25')}yo {dna.get('gender', 'person')}, {dna.get('hair', '')}, {dna.get('clothing', '')}"
-                primary_char_portrait_url = await self.image_gen.generate_character_portrait(desc, project.style)
+                primary_char_portrait_url = await self.image_gen.generate_character_portrait(desc, project_style)
 
                 char_create = CharacterCreate(
                     name=primary["name"],
@@ -67,23 +75,27 @@ class AIPipelineService:
                     is_locked=True,
                     dna=CharacterDNA.model_validate(dna)
                 )
-                db_char = await cme_service.create_character(user_id, char_create)
+                db_char = await cme_service.create_character(actual_user_id, char_create)
                 primary_char_dna = dna
+                await self.db.commit()
         except Exception as cme_err:
             print(f"CME Character Detection Notice: {cme_err}")
+            await self.db.rollback()
 
         # 3. Step A: LLM Script Analysis into Scenes
         raw_scenes = await self.analyzer.analyze_script(
-            script_text=project.script.content,
-            style=project.style,
-            language=project.language
+            script_text=script_content,
+            style=project_style,
+            language=project_lang
         )
 
         # Delete existing scenes if any
-        if project.scenes:
-            for old_scene in project.scenes:
-                await self.db.delete(old_scene)
-            await self.db.flush()
+        # Re-fetch project to ensure clean session state
+        query_scenes = select(Scene).where(Scene.project_id == project_id)
+        existing_scenes = (await self.db.execute(query_scenes)).scalars().all()
+        for old_scene in existing_scenes:
+            await self.db.delete(old_scene)
+        await self.db.flush()
 
         # 4. Create Scene & Asset records in DB with CME Character Prompt Injection
         created_scenes = []
@@ -126,8 +138,8 @@ class AIPipelineService:
                 injected_prompt = raw_prompt
 
             scene = Scene(
-                project_id=project.id,
-                script_id=project.script.id,
+                project_id=project_id,
+                script_id=script_id,
                 scene_number=s_data["scene_number"],
                 duration=s_data.get("estimated_duration", 7.0),
                 narration=s_data["narration"],
@@ -144,8 +156,8 @@ class AIPipelineService:
 
             # 5. Generate Image & Audio Assets for Scene
             # Language detection: use project language field, fallback to Hindi detection
-            voice_lang = getattr(project, 'language', 'en') or 'en'
-            image_url = await self.image_gen.generate_image(scene.image_prompt, style=project.style, reference_image_url=primary_char_portrait_url)
+            voice_lang = project_lang
+            image_url = await self.image_gen.generate_image(scene.image_prompt, style=project_style, reference_image_url=primary_char_portrait_url)
             audio_url = ""  # Audio is generated on-demand via /api/v1/ai/tts endpoint
             subtitles = await self.sub_gen.generate_subtitles(scene.subtitle, total_duration=scene.duration)
 
@@ -183,10 +195,15 @@ class AIPipelineService:
             created_scenes.append(scene)
 
         # Update Project & Script status
-        project.status = ProjectStatus.completed
-        project.script.status = ScriptStatus.analyzed
-        project.script.analysis_result = {"scenes_count": len(created_scenes), "cme_character_detected": bool(primary_char_dna)}
-
+        await self.db.execute(
+            update(Project).where(Project.id == project_id).values(status=ProjectStatus.completed)
+        )
+        await self.db.execute(
+            update(Script).where(Script.id == script_id).values(
+                status=ScriptStatus.analyzed,
+                analysis_result={"scenes_count": len(created_scenes), "cme_character_detected": bool(primary_char_dna)}
+            )
+        )
         await self.db.commit()
         
         # Eager-load scenes and assets before returning

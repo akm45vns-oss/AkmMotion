@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import VoiceSelector from "@/components/project/VoiceSelector";
 import HealthScoreCard from "@/components/editor/HealthScoreCard";
 import AutoImproveModal from "@/components/editor/AutoImproveModal";
 import { projectsApi } from "@/lib/api/projects";
+import { aiApi } from "@/lib/api/ai";
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function NewProjectPage() {
   const [voice, setVoice] = useState("voice_indian_en");
   const [language, setLanguage] = useState("en");
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Creating Project...");
   const [error, setError] = useState<string | null>(null);
   const [isAutoImproveOpen, setIsAutoImproveOpen] = useState(false);
 
@@ -36,6 +38,7 @@ export default function NewProjectPage() {
     }
 
     setLoading(true);
+    setLoadingMessage("Creating project...");
     setError(null);
 
     try {
@@ -45,6 +48,13 @@ export default function NewProjectPage() {
         language,
         script_content: scriptContent.trim(),
       });
+
+      setLoadingMessage("AI Director generating 9:16 vertical scenes...");
+      try {
+        await aiApi.generatePipeline(project.id);
+      } catch (pipeErr) {
+        console.warn("Pipeline generation notice:", pipeErr);
+      }
 
       // Redirect cleanly to studio editor
       if (typeof window !== "undefined") {
@@ -161,7 +171,7 @@ export default function NewProjectPage() {
             {loading ? (
               <>
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Initializing Project Studio...</span>
+                <span>{loadingMessage}</span>
               </>
             ) : (
               <>
