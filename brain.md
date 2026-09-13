@@ -63,10 +63,27 @@ PROJECT d0331de9-c81e-47d7-8d38-ba8a0682b07f SCENES COUNT: 6
 
 ## LIVE SERVER ENDPOINTS
 
+### Local Development
 - Next.js Frontend: `http://localhost:3000`
 - FastAPI Backend: `http://localhost:8000`
-- OpenAPI Swagger Docs: `http://localhost:8000/docs#/Character%20Memory%20Engine`
+- OpenAPI Swagger Docs: `http://localhost:8000/docs`
 - Character Studio UI: `http://localhost:3000/characters`
+
+### Production (Cloud)
+- Frontend (Vercel): `https://akm-motion.vercel.app`
+- Backend (Render): `https://akmmotion-backend.onrender.com`
+- Backend Swagger: `https://akmmotion-backend.onrender.com/docs`
+- Health Check: `https://akmmotion-backend.onrender.com/api/v1/health`
+- UptimeRobot: Monitoring backend every 14 min (keeps Render awake, zero cold starts)
+
+---
+
+## CORS ARCHITECTURE
+
+- Frontend calls `/api/v1/*` (same-origin relative path)
+- `next.config.js` rewrites: `/api/v1/*` → `https://akmmotion-backend.onrender.com/api/v1/*`
+- Runs at Vercel CDN level — no serverless timeout, no browser CORS, no cold-start failures
+- UptimeRobot pings `/api/v1/health` every 14 min → Render stays warm always
 
 ---
 
@@ -75,7 +92,9 @@ PROJECT d0331de9-c81e-47d7-8d38-ba8a0682b07f SCENES COUNT: 6
 1. Always read brain.md first.
 2. Maintain project memory integrity.
 3. Everything is 100% verified and operational.
+4. CORS is solved via `next.config.js` rewrites — do NOT revert to direct Render calls.
+5. UptimeRobot keeps Render warm — no cold start issues.
 
 ---
 
-*End of brain.md — Last updated: 2026-09-13 17:05 IST*
+*End of brain.md — Last updated: 2026-09-13 17:54 IST*
