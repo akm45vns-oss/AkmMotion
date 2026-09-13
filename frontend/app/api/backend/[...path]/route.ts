@@ -1,9 +1,10 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 
-// Priority:
-// 1. BACKEND_INTERNAL_URL env var (set in Vercel dashboard)
-// 2. Hardcoded Render URL as production fallback
-// 3. localhost for local dev
+// Tell Vercel to allow up to 60 seconds for this route (needed for Render cold starts)
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
+// Priority: env var → hardcoded Render URL
 const BACKEND_URL =
   process.env.BACKEND_INTERNAL_URL ||
   "https://akmmotion-backend.onrender.com";
@@ -28,32 +29,49 @@ async function proxyRequest(
   const auth = req.headers.get("authorization");
   if (auth) headers["Authorization"] = auth;
 
-  try {
-    console.log(`[Proxy] ${req.method} ${targetUrl}`);
-    const backendRes = await fetch(targetUrl, {
-      method: req.method,
-      headers,
-      body,
-      // Give Render cold-start up to 60 seconds
-      signal: AbortSignal.timeout(60000),
-    });
-    const responseBody = await backendRes.arrayBuffer();
-    console.log(`[Proxy] Response: ${backendRes.status}`);
-    return new NextResponse(responseBody, {
-      status: backendRes.status,
-      headers: {
-        "Content-Type":
-          backendRes.headers.get("content-type") || "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
-  } catch (error: any) {
-    console.error("[API Proxy] Backend unreachable:", error.message);
-    return NextResponse.json(
-      { detail: "Backend is waking up (cold start). Please wait 30 seconds and try again." },
-      { status: 503 }
-    );
+  // Retry once if we get a network error (handles Render cold start)
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      console.log(`[Proxy] Attempt ${attempt}: ${req.method} ${targetUrl}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
+
+      const backendRes = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      const responseBody = await backendRes.arrayBuffer();
+      console.log(`[Proxy] Success: ${backendRes.status}`);
+      return new NextResponse(responseBody, {
+        status: backendRes.status,
+        headers: {
+          "Content-Type":
+            backendRes.headers.get("content-type") || "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+    } catch (error: any) {
+      console.error(`[Proxy] Attempt ${attempt} failed:`, error.message);
+      if (attempt === 2) {
+        return NextResponse.json(
+          {
+            detail:
+              "Backend is waking up (cold start). Please wait 30 seconds and try again.",
+          },
+          { status: 503 }
+        );
+      }
+      // Wait 2 seconds before retry
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
+
+  // Unreachable but TypeScript needs it
+  return NextResponse.json({ detail: "Unexpected error" }, { status: 500 });
 }
 
 export const GET = proxyRequest;

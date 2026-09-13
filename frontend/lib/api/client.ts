@@ -1,15 +1,11 @@
 import axios from "axios";
 
-// Use the Next.js backend proxy in all environments EXCEPT when explicitly
-// pointing to localhost (local development without proxy).
-const explicitUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-const isLocalDev = explicitUrl.includes("localhost") || explicitUrl.includes("127.0.0.1");
-
-// In production on Vercel: /api/backend proxies to Render (no CORS).
-// In local dev: point directly at FastAPI.
-export const API_BASE_URL = isLocalDev
-  ? explicitUrl
-  : "/api/backend";
+// CORS is fixed on the backend — call Render directly (no proxy needed).
+// Production: NEXT_PUBLIC_API_BASE_URL must be set to the Render backend URL in Vercel.
+// Development: falls back to localhost.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://akmmotion-backend.onrender.com/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
