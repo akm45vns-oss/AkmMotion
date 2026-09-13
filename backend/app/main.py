@@ -48,17 +48,43 @@ app.include_router(api_router, prefix="/api")
 
 @app.on_event("startup")
 async def on_startup():
-    """Ensure all 28 database tables and schema are automatically created on startup."""
+    """Ensure all 28 database tables are created and guest user is seeded."""
     try:
         import app.models.models
         import app.models.character
         from app.db.base import Base
-        from app.db.session import engine
+        from app.db.session import engine, AsyncSessionLocal
+        from sqlalchemy import text
+
+        # 1. Create all tables
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         print("[Startup] All database tables verified / created successfully.")
+
+        # 2. Seed the guest user so guest sessions can create projects (FK requirement)
+        GUEST_USER_ID = "595744ab-c375-4bec-a3c0-429113163fe1"
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                text("SELECT id FROM users WHERE id = :uid LIMIT 1"),
+                {"uid": GUEST_USER_ID}
+            )
+            if not result.fetchone():
+                await session.execute(
+                    text("""
+                        INSERT INTO users (id, email, full_name, is_active, is_verified, auth_provider, created_at, updated_at)
+                        VALUES (:uid, 'guest@akmmotion.ai', 'Guest Studio', true, true, 'email', NOW(), NOW())
+                        ON CONFLICT (id) DO NOTHING
+                    """),
+                    {"uid": GUEST_USER_ID}
+                )
+                await session.commit()
+                print("[Startup] Guest user seeded successfully.")
+            else:
+                print("[Startup] Guest user already exists.")
+
+
     except Exception as e:
-        print(f"[Startup] Notice during database auto-init: {e}")
+        print(f"[Startup] Notice during database init: {e}")
 
 
 @app.get("/")
