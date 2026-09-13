@@ -1,4 +1,4 @@
-﻿-- AkmMotion Neon PostgreSQL Production Schema DDL
+-- AkmMotion Neon PostgreSQL Production Schema DDL
 -- Complete 18-Table Schema with Indexes, Foreign Keys, and Constraints
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -295,3 +295,107 @@ CREATE TABLE IF NOT EXISTS characters (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id);
+
+-- 19. character_profiles
+CREATE TABLE IF NOT EXISTS character_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    role VARCHAR(64) DEFAULT 'Protagonist' NOT NULL,
+    age INTEGER DEFAULT 25 NOT NULL,
+    gender VARCHAR(32) DEFAULT 'Male' NOT NULL,
+    ethnicity VARCHAR(64),
+    summary TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_character_profiles_char_id ON character_profiles(character_id);
+
+-- 20. character_dna
+CREATE TABLE IF NOT EXISTS character_dna (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    skin_tone VARCHAR(64) DEFAULT 'Medium',
+    hair_color VARCHAR(64) DEFAULT 'Black',
+    hair_style VARCHAR(64) DEFAULT 'Short neat',
+    hair_length VARCHAR(64) DEFAULT 'Short',
+    eye_color VARCHAR(64) DEFAULT 'Brown',
+    face_shape VARCHAR(64) DEFAULT 'Oval',
+    beard VARCHAR(64),
+    mustache VARCHAR(64),
+    body_type VARCHAR(64) DEFAULT 'Average',
+    height_category VARCHAR(64) DEFAULT 'Medium',
+    outfit VARCHAR(255) DEFAULT 'Casual blue hoodie and black jeans',
+    shoes VARCHAR(128) DEFAULT 'White sneakers',
+    expression VARCHAR(128) DEFAULT 'Friendly smile',
+    visual_style VARCHAR(128) DEFAULT 'Pixar 3D Render',
+    lighting_preference VARCHAR(128) DEFAULT 'Cinematic golden hour light',
+    camera_preference VARCHAR(128) DEFAULT 'Medium eye-level shot',
+    prompt_prefix TEXT DEFAULT 'Masterpiece 9:16 vertical 8k render',
+    prompt_suffix TEXT DEFAULT 'same facial features, same clothes, consistent identity',
+    negative_prompt TEXT DEFAULT 'deformed face, wrong clothes, inconsistent character',
+    consistency_strength FLOAT DEFAULT 0.95,
+    attributes_json JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_character_dna_char_id ON character_dna(character_id);
+
+-- 21. character_embeddings
+CREATE TABLE IF NOT EXISTS character_embeddings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    embedding_type VARCHAR(64) DEFAULT 'face',
+    vector_data JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- 22. character_styles
+CREATE TABLE IF NOT EXISTS character_styles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    style_name VARCHAR(64) NOT NULL,
+    prompt_modifier TEXT NOT NULL
+);
+
+-- 23. character_outfits
+CREATE TABLE IF NOT EXISTS character_outfits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    outfit_name VARCHAR(64) NOT NULL,
+    description TEXT NOT NULL
+);
+
+-- 24. character_accessories
+CREATE TABLE IF NOT EXISTS character_accessories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    accessory_name VARCHAR(64) NOT NULL
+);
+
+-- 25. character_relationships
+CREATE TABLE IF NOT EXISTS character_relationships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    related_character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    relationship_type VARCHAR(64) NOT NULL
+);
+
+-- 26. character_reference_images
+CREATE TABLE IF NOT EXISTS character_reference_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- 27. character_scene_assignments
+CREATE TABLE IF NOT EXISTS character_scene_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    scene_id UUID NOT NULL REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+-- 28. character_versions
+CREATE TABLE IF NOT EXISTS character_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    dna_snapshot JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
