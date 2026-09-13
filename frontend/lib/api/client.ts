@@ -1,11 +1,15 @@
 import axios from "axios";
 
-// In production (Vercel), route through Next.js proxy to avoid CORS.
-// In development, call the local FastAPI server directly.
-const isProduction = typeof window !== "undefined" && !window.location.hostname.includes("localhost");
-export const API_BASE_URL = isProduction
-  ? "/api/backend"  // Vercel proxy → no CORS
-  : (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1");
+// Use the Next.js backend proxy in all environments EXCEPT when explicitly
+// pointing to localhost (local development without proxy).
+const explicitUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const isLocalDev = explicitUrl.includes("localhost") || explicitUrl.includes("127.0.0.1");
+
+// In production on Vercel: /api/backend proxies to Render (no CORS).
+// In local dev: point directly at FastAPI.
+export const API_BASE_URL = isLocalDev
+  ? explicitUrl
+  : "/api/backend";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -13,6 +17,7 @@ export const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
 
 
 // Request interceptor to attach JWT token (auto-initializes guest token if not set)

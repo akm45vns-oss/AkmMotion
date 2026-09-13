@@ -1,8 +1,12 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 
+// Priority:
+// 1. BACKEND_INTERNAL_URL env var (set in Vercel dashboard)
+// 2. Hardcoded Render URL as production fallback
+// 3. localhost for local dev
 const BACKEND_URL =
   process.env.BACKEND_INTERNAL_URL ||
-  (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1").replace("/api/v1", "");
+  "https://akmmotion-backend.onrender.com";
 
 async function proxyRequest(
   req: NextRequest,
@@ -25,12 +29,16 @@ async function proxyRequest(
   if (auth) headers["Authorization"] = auth;
 
   try {
+    console.log(`[Proxy] ${req.method} ${targetUrl}`);
     const backendRes = await fetch(targetUrl, {
       method: req.method,
       headers,
       body,
+      // Give Render cold-start up to 60 seconds
+      signal: AbortSignal.timeout(60000),
     });
     const responseBody = await backendRes.arrayBuffer();
+    console.log(`[Proxy] Response: ${backendRes.status}`);
     return new NextResponse(responseBody, {
       status: backendRes.status,
       headers: {
@@ -42,7 +50,7 @@ async function proxyRequest(
   } catch (error: any) {
     console.error("[API Proxy] Backend unreachable:", error.message);
     return NextResponse.json(
-      { detail: "Backend service temporarily unavailable. Please try again in a moment." },
+      { detail: "Backend is waking up (cold start). Please wait 30 seconds and try again." },
       { status: 503 }
     );
   }
