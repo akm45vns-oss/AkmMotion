@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000"
 
     # Neon PostgreSQL Database
-    DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_GcaYrQ2KYrJ5@ep-still-dawn-aypk5nmw-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
-    SYNC_DATABASE_URL: str = "postgresql://neondb_owner:npg_GcaYrQ2KYrJ5@ep-still-dawn-aypk5nmw-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_pYKgFxNOA25E@ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech/neondb?ssl=require"
+    SYNC_DATABASE_URL: str = "postgresql://neondb_owner:npg_pYKgFxNOA25E@ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
     # Cloudflare R2 / S3 Storage Credentials
     R2_ACCOUNT_ID: str = ""
