@@ -1,11 +1,11 @@
 import axios from "axios";
 
-// CORS is fixed on the backend — call Render directly (no proxy needed).
-// Production: NEXT_PUBLIC_API_BASE_URL must be set to the Render backend URL in Vercel.
-// Development: falls back to localhost.
+// next.config.js rewrites /api/v1/* → Render backend at CDN level.
+// Same origin = zero CORS. Works in prod (Vercel) and dev (Next.js dev server).
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://akmmotion-backend.onrender.com/api/v1";
+  typeof window === "undefined"
+    ? process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1"
+    : "/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
