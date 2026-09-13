@@ -19,27 +19,19 @@ class ProjectRepository:
                 .options(selectinload(Project.script))
             )
             result = await self.db.execute(query)
-            proj = result.scalar_one_or_none()
-            if proj:
-                return proj
-
-        query = (
-            select(Project)
-            .where(Project.id == project_id)
-            .options(selectinload(Project.script))
-        )
-        result = await self.db.execute(query)
-        return result.scalar_one_or_none()
+            return result.scalar_one_or_none()
+        return None
 
     async def list_by_user(
         self, user_id: UUID, skip: int = 0, limit: int = 20
     ) -> Tuple[List[Project], int]:
-        count_query = select(func.count(Project.id))
+        count_query = select(func.count(Project.id)).where(Project.user_id == user_id)
         total_result = await self.db.execute(count_query)
         total = total_result.scalar_one()
 
         query = (
             select(Project)
+            .where(Project.user_id == user_id)
             .options(selectinload(Project.script))
             .order_by(Project.updated_at.desc())
             .offset(skip)

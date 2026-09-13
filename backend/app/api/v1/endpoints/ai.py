@@ -13,6 +13,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db, get_current_user_id
+from app.core.rate_limit import rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen, rate_limit_pipeline
 from app.schemas.project import ProjectResponse
 from app.services.ai_pipeline_service import AIPipelineService
 from app.services.ai.script_intelligence import ScriptHealthEvaluator, ScriptImprover
@@ -27,7 +28,11 @@ router = APIRouter(prefix="/ai", tags=["AI Pipeline"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/analyze-script")
-async def analyze_script_health(payload: dict = Body(...)):
+async def analyze_script_health(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_script_ai)
+):
     """Evaluates script health and returns 0-100 score + AI suggestions."""
     script_text = payload.get("script", "")
     language = payload.get("language", "Auto Detect")
@@ -36,7 +41,11 @@ async def analyze_script_health(payload: dict = Body(...)):
 
 
 @router.post("/improve-script")
-async def auto_improve_script(payload: dict = Body(...)):
+async def auto_improve_script(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_script_ai)
+):
     """Auto-improves script grammar, flow, and hook while preserving meaning."""
     script_text = payload.get("script", "")
     result = ScriptImprover.improve(script_text)
@@ -51,13 +60,11 @@ async def auto_improve_script(payload: dict = Body(...)):
 async def generate_ai_pipeline(
     project_id: UUID,
     current_user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(rate_limit_pipeline)
 ):
     """Runs the full AI pipeline: script → scenes → images → audio → subtitles."""
-    try:
-        user_uuid = UUID(str(current_user_id))
-    except Exception:
-        user_uuid = UUID("595744ab-c375-4bec-a3c0-429113163fe1")
+    user_uuid = UUID(str(current_user_id))
     service = AIPipelineService(db)
     project = await service.run_pipeline(project_id, user_uuid)
     return ProjectResponse.from_project(project)
@@ -68,7 +75,11 @@ async def generate_ai_pipeline(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/tts")
-async def generate_speech(payload: dict = Body(...)):
+async def generate_speech(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    _rate_limit: bool = Depends(rate_limit_tts)
+):
     """
     Synthesizes studio-grade neural speech audio (Edge TTS / OpenAI / gTTS) for a given text.
     Accepts: { text, language?, gender?, voice? }
@@ -128,10 +139,16 @@ async def generate_speech_get(
     text: str,
     language: str = "en",
     gender: str = "male",
-    voice: Optional[str] = None
+    voice: Optional[str] = None,
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_tts)
 ):
     """GET endpoint for HTML5 Audio element streaming."""
-    return await generate_speech({"text": text, "language": language, "gender": gender, "voice": voice})
+    return await generate_speech(
+        {"text": text, "language": language, "gender": gender, "voice": voice},
+        current_user_id=current_user_id,
+        _rate_limit=True
+    )
 
 
 def _silent_mp3() -> bytes:
@@ -156,7 +173,10 @@ def _silent_mp3() -> bytes:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/word-timings")
-async def get_word_timings(payload: dict = Body(...)):
+async def get_word_timings(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id)
+):
     """
     Returns per-word timing array for karaoke subtitle sync.
     Accepts: { text, duration }
@@ -183,33 +203,72 @@ async def image_proxy(url: str):
     Server-side image proxy that fetches external images and returns them
     with CORS headers, bypassing browser canvas taint restrictions.
     Used by RenderModal.tsx to load images into <canvas> for video export.
+    Hardened against SSRF: allows only verified public CDNs and blocks internal/private IPs.
     """
     import httpx
-    if not url or not url.startswith("http"):
+    import ipaddress
+    import socket
+
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
         return Response(status_code=400, content=b"Invalid URL")
 
-    # Allow only known safe image hosts
-    allowed_hosts = [
-        "image.pollinations.ai",
-        "images.unsplash.com",
+    # Strict allowlist of trusted domains
+    allowed_domains = [
         "pollinations.ai",
+        "image.pollinations.ai",
+        "unsplash.com",
+        "images.unsplash.com",
         "source.unsplash.com",
     ]
-    parsed = urllib.parse.urlparse(url)
-    if not any(parsed.netloc.endswith(h) for h in allowed_hosts):
-        return Response(status_code=403, content=b"Host not allowed")
 
     try:
-        async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+        parsed = urllib.parse.urlparse(url)
+        hostname = (parsed.hostname or "").lower().strip()
+        if not hostname:
+            return Response(status_code=400, content=b"Invalid hostname")
+
+        # Check domain allowlist (must be exact match or dot-prefixed subdomain)
+        is_allowed_domain = any(
+            hostname == d or hostname.endswith("." + d)
+            for d in allowed_domains
+        )
+        if not is_allowed_domain:
+            return Response(status_code=403, content=b"Host not allowed")
+
+        # Resolve hostname to check for internal/private/loopback/cloud metadata IP addresses
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+            for entry in addr_info:
+                ip_str = entry[4][0]
+                ip = ipaddress.ip_address(ip_str)
+                if (
+                    ip.is_private
+                    or ip.is_loopback
+                    or ip.is_link_local
+                    or ip.is_multicast
+                    or ip.is_reserved
+                    or ip.is_unspecified
+                ):
+                    return Response(status_code=403, content=b"Private network access blocked")
+        except socket.gaierror:
+            return Response(status_code=400, content=b"Hostname resolution failed")
+
+    except Exception:
+        return Response(status_code=400, content=b"Invalid URL")
+
+    try:
+        # follow_redirects=False prevents open-redirect SSRF bypasses
+        async with httpx.AsyncClient(timeout=25.0, follow_redirects=False) as client:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept":     "image/webp,image/png,image/jpeg,*/*",
             }
             resp = await client.get(url, headers=headers)
+            if resp.is_redirect:
+                return Response(status_code=403, content=b"Redirects not permitted")
             content_type = resp.headers.get("content-type", "image/jpeg")
             content = resp.content
             if not content or len(content) == 0:
-                # If upstream returned empty, return fallback 1x1 transparent JPEG/PNG
                 content = _minimal_jpeg()
             return Response(
                 content=content,
@@ -223,12 +282,11 @@ async def image_proxy(url: str):
                 }
             )
     except Exception as e:
-        print(f"[ImageProxy] Error fetching {url[:80]}: {e}")
-        # Return fallback image instead of 502 to avoid canvas breakage
+        print(f"[Image Proxy] Fetch error for {url}: {e}")
         return Response(
             content=_minimal_jpeg(),
             media_type="image/jpeg",
-            headers={"Access-Control-Allow-Origin": "*", "X-Proxy-Fallback": "1"}
+            headers={"Access-Control-Allow-Origin": "*", "X-Proxy-Error": str(e)[:100]}
         )
 
 
@@ -256,14 +314,15 @@ def _minimal_jpeg() -> bytes:
 async def regenerate_scene_image(
     payload: dict = Body(...),
     current_user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(rate_limit_image_gen)
 ):
     """
     Regenerates the image for a single scene with a fresh Pollinations seed.
     Accepts: { scene_id, prompt?, style? }
     Returns: { scene_id, image_url }
     """
-    from app.models.models import Scene, SceneAsset, AssetType
+    from app.models.models import Scene, SceneAsset, AssetType, Project
 
     scene_id_str = payload.get("scene_id", "")
     custom_prompt = payload.get("prompt", "")
@@ -277,10 +336,13 @@ async def regenerate_scene_image(
     except ValueError:
         return Response(status_code=400, content=b"Invalid scene_id")
 
-    # Fetch scene from DB
+    user_uuid = UUID(str(current_user_id))
+
+    # Fetch scene from DB with ownership check
     result = await db.execute(
         select(Scene)
-        .where(Scene.id == scene_id)
+        .join(Project, Scene.project_id == Project.id)
+        .where(Scene.id == scene_id, Project.user_id == user_uuid)
         .options(selectinload(Scene.assets))
     )
     scene = result.scalar_one_or_none()
@@ -347,16 +409,33 @@ async def regenerate_scene_image(
 @router.post("/generate-scene-prompt")
 async def generate_scene_prompt(
     payload: dict = Body(...),
-    current_user_id: str = Depends(get_current_user_id)
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Uses LLM to craft an accurate, vivid English visual prompt for a scene based on its narration and context.
-    Accepts: { narration, style?, story_context? }
+    Accepts: { narration, style?, story_context?, project_id? }
     Returns: { prompt }
     """
     narration = payload.get("narration", "").strip()
     style = payload.get("style", "Cinematic")
     context = payload.get("story_context", "")
+    project_id_str = payload.get("project_id")
+
+    # If project_id is provided, verify ownership
+    if project_id_str:
+        try:
+            from app.models.models import Project
+            project_id = UUID(project_id_str)
+            user_uuid = UUID(str(current_user_id))
+            result = await db.execute(
+                select(Project).where(Project.id == project_id, Project.user_id == user_uuid)
+            )
+            project = result.scalar_one_or_none()
+            if not project:
+                return Response(status_code=404, content=b"Project not found")
+        except ValueError:
+            return Response(status_code=400, content=b"Invalid project_id")
 
     if not narration:
         return {"prompt": f"Cinematic wide establishing shot, {style} visual style, 9:16 vertical format, 8k"}
@@ -398,10 +477,17 @@ async def generate_scene_prompt(
 async def list_ai_voices():
     """Lists available voice options for the voice picker UI."""
     return [
-        {"id": "en_male",  "name": "Rishi — Indian English",  "lang": "en", "gender": "male",   "provider": "gtts"},
-        {"id": "en_female","name": "Heera — Indian English",   "lang": "en", "gender": "female", "provider": "gtts"},
-        {"id": "hi_male",  "name": "Arjun — Hindi",            "lang": "hi", "gender": "male",   "provider": "gtts"},
-        {"id": "hi_female","name": "Swara — Hindi",            "lang": "hi", "gender": "female", "provider": "gtts"},
+        {"id": "voice_indian_en", "name": "Rishi (Indian Accent English)", "gender": "male",   "lang": "en", "style": "Warm & Native Accent", "provider": "edge"},
+        {"id": "voice_indian_hi", "name": "Heera (Native Hindi Voice)",    "gender": "female", "lang": "hi", "style": "Authentic & Expressive", "provider": "edge"},
+        {"id": "voice_alloy",     "name": "Alloy (Narrator)",              "gender": "male",   "lang": "en", "style": "Calm & Direct", "provider": "edge"},
+        {"id": "voice_echo",      "name": "Echo (Energetic)",              "gender": "male",   "lang": "en", "style": "Upbeat & Dynamic", "provider": "edge"},
+        {"id": "voice_fable",     "name": "Fable (Storyteller)",           "gender": "female", "lang": "en", "style": "Warm & Storyteller", "provider": "edge"},
+        {"id": "voice_onyx",      "name": "Onyx (Deep Voice)",             "gender": "male",   "lang": "en", "style": "Authoritative & Deep", "provider": "edge"},
+        # Legacy aliases for backwards compatibility
+        {"id": "en_male",         "name": "Rishi — Indian English",        "gender": "male",   "lang": "en", "provider": "edge"},
+        {"id": "en_female",       "name": "Heera — Indian English",        "gender": "female", "lang": "en", "provider": "edge"},
+        {"id": "hi_male",         "name": "Arjun — Hindi",                 "gender": "male",   "lang": "hi", "provider": "edge"},
+        {"id": "hi_female",       "name": "Swara — Hindi",                 "gender": "female", "lang": "hi", "provider": "edge"},
     ]
 
 
@@ -447,12 +533,16 @@ async def groq_key_status():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/generate-scenes")
-async def generate_scenes_from_script(payload: dict = Body(...)):
+async def generate_scenes_from_script(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_script_ai)
+):
     """
     Runs Groq scene analysis directly on a script and returns scene JSON.
     Accepts: { script, style?, language? }
     Returns: { scenes: [...], source: 'groq'|'openai'|'heuristic' }
-    No authentication required — used during project creation flow.
+    Requires active user or guest session context.
     """
     from app.services.ai.script_analyzer import ScriptAnalyzerService
     script_text = payload.get("script", "").strip()

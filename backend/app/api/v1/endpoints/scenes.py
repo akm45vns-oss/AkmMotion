@@ -16,10 +16,7 @@ async def get_project_scenes(
     db: AsyncSession = Depends(get_db)
 ):
     repo = SceneRepository(db)
-    try:
-        user_uuid = UUID(str(current_user_id))
-    except Exception:
-        user_uuid = UUID("595744ab-c375-4bec-a3c0-429113163fe1")
+    user_uuid = UUID(str(current_user_id))
     scenes = await repo.get_by_project(project_id, user_uuid)
     return [SceneResponse.from_scene(s) for s in scenes]
 
@@ -32,7 +29,8 @@ async def update_scene(
     db: AsyncSession = Depends(get_db)
 ):
     repo = SceneRepository(db)
-    scene = await repo.get_by_id(scene_id)
+    user_uuid = UUID(str(current_user_id))
+    scene = await repo.get_by_id(scene_id, user_uuid)
     if not scene:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scene not found")
 
@@ -64,8 +62,9 @@ async def reorder_scenes(
     db: AsyncSession = Depends(get_db)
 ):
     repo = SceneRepository(db)
+    user_uuid = UUID(str(current_user_id))
     tuples = [(item.scene_id, item.scene_number) for item in req.items]
-    await repo.reorder(tuples)
+    await repo.reorder(tuples, user_uuid)
     return {"message": "Scenes reordered successfully"}
 
 
@@ -76,7 +75,8 @@ async def delete_scene(
     db: AsyncSession = Depends(get_db)
 ):
     repo = SceneRepository(db)
-    scene = await repo.get_by_id(scene_id)
+    user_uuid = UUID(str(current_user_id))
+    scene = await repo.get_by_id(scene_id, user_uuid)
     if not scene:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scene not found")
     await repo.delete(scene)

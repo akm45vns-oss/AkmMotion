@@ -5,14 +5,15 @@ from fastapi import HTTPException, status
 from app.repositories.project_repo import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse
 
-DEFAULT_GUEST_UUID = UUID("595744ab-c375-4bec-a3c0-429113163fe1")
-
 
 def parse_user_uuid(user_id_str: str) -> UUID:
     try:
         return UUID(str(user_id_str))
     except Exception:
-        return DEFAULT_GUEST_UUID
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user identifier"
+        )
 
 
 class ProjectService:
@@ -22,9 +23,6 @@ class ProjectService:
     async def get_project(self, project_id: UUID, user_id_str: str) -> ProjectResponse:
         user_uuid = parse_user_uuid(user_id_str)
         project = await self.repo.get_by_id(project_id, user_uuid)
-        if not project:
-            # Fallback check without user restriction
-            project = await self.repo.get_by_id(project_id, None)
         if not project:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -47,6 +45,9 @@ class ProjectService:
 
     async def create_project(self, data: ProjectCreate, user_id_str: str) -> ProjectResponse:
         user_uuid = parse_user_uuid(user_id_str)
+        from app.core.dependencies import ensure_user_in_db
+        await ensure_user_in_db(self.repo.db, user_uuid)
+
         project = await self.repo.create(
             user_id=user_uuid,
             title=data.title,

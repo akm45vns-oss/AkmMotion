@@ -38,6 +38,9 @@ class AIPipelineService:
         if not project:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
+        if user_id and project.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
         if not project.script or not project.script.content.strip():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project does not have a valid script to analyze")
 

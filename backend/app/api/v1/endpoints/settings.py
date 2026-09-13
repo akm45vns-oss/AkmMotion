@@ -1,4 +1,4 @@
-﻿from uuid import UUID
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -33,6 +33,8 @@ async def get_settings(
     settings_obj = result.scalar_one_or_none()
 
     if not settings_obj:
+        from app.core.dependencies import ensure_user_in_db
+        await ensure_user_in_db(db, UUID(current_user_id))
         # Create default
         settings_obj = UserSettings(user_id=UUID(current_user_id))
         db.add(settings_obj)
@@ -53,6 +55,8 @@ async def update_settings(
     settings_obj = result.scalar_one_or_none()
 
     if not settings_obj:
+        from app.core.dependencies import ensure_user_in_db
+        await ensure_user_in_db(db, UUID(current_user_id))
         settings_obj = UserSettings(user_id=UUID(current_user_id))
         db.add(settings_obj)
 

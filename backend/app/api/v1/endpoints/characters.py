@@ -1,8 +1,9 @@
-﻿from typing import List, Optional
+from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, get_current_user_id
+from app.core.rate_limit import rate_limit_script_ai
 from app.services.ai.character_memory import CharacterMemoryService
 from app.services.ai.character_detector import CharacterDetectorService
 from app.services.ai.character_evaluator import CharacterEvaluatorService
@@ -89,7 +90,8 @@ async def get_character(
     db: AsyncSession = Depends(get_db)
 ):
     service = CharacterMemoryService(db)
-    character = await service.get_character_by_id(character_id)
+    user_uuid = UUID(current_user_id)
+    character = await service.get_character_by_id(character_id, user_uuid)
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
     return format_character_response(character)
@@ -102,7 +104,8 @@ async def lock_character(
     db: AsyncSession = Depends(get_db)
 ):
     service = CharacterMemoryService(db)
-    character = await service.set_lock_status(character_id, is_locked=True)
+    user_uuid = UUID(current_user_id)
+    character = await service.set_lock_status(character_id, is_locked=True, user_id=user_uuid)
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
     return format_character_response(character)
@@ -115,21 +118,30 @@ async def unlock_character(
     db: AsyncSession = Depends(get_db)
 ):
     service = CharacterMemoryService(db)
-    character = await service.set_lock_status(character_id, is_locked=False)
+    user_uuid = UUID(current_user_id)
+    character = await service.set_lock_status(character_id, is_locked=False, user_id=user_uuid)
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
     return format_character_response(character)
 
 
 @router.post("/extract")
-async def extract_characters_from_script(payload: dict = Body(...)):
+async def extract_characters_from_script(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_script_ai)
+):
     script_text = payload.get("script", "")
     detected = CharacterDetectorService.detect_characters(script_text)
     return {"detected_characters": detected}
 
 
 @router.post("/evaluate")
-async def evaluate_character_consistency(payload: dict = Body(...)):
+async def evaluate_character_consistency(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_script_ai)
+):
     scene_prompt = payload.get("scene_prompt", "")
     character_dna = payload.get("dna", {})
     report = CharacterEvaluatorService.evaluate_consistency(scene_prompt, character_dna)

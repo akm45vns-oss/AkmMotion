@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 import time
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,9 @@ class CharacterMemoryService:
         self.db = db
 
     async def create_character(self, user_id: uuid.UUID, data: CharacterCreate) -> DBCharacter:
+        from app.core.dependencies import ensure_user_in_db
+        await ensure_user_in_db(self.db, user_id)
+
         character = DBCharacter(
             user_id=user_id,
             project_id=data.project_id,
@@ -67,8 +70,7 @@ class CharacterMemoryService:
         version = DBCharacterVersion(
             character_id=character.id,
             version_number=1,
-            snapshot_dna=dna_dict,
-            notes="Version 1: Initial Character Profile Created"
+            dna_snapshot=dna_dict
         )
         self.db.add(version)
         await self.db.commit()
@@ -78,19 +80,23 @@ class CharacterMemoryService:
 
         return await self.get_character_by_id(character.id)
 
-    async def get_character_by_id(self, character_id: uuid.UUID) -> Optional[DBCharacter]:
+    async def get_character_by_id(self, character_id: uuid.UUID, user_id: Optional[uuid.UUID] = None) -> Optional[DBCharacter]:
         # Fast Cache Lookup
         cached_dna = CharacterCache.get(str(character_id))
         
         stmt = (
             select(DBCharacter)
             .where(DBCharacter.id == character_id)
-            .options(
-                selectinload(DBCharacter.profile),
-                selectinload(DBCharacter.dna),
-                selectinload(DBCharacter.versions),
-                selectinload(DBCharacter.scene_assignments)
-            )
+        )
+        
+        if user_id:
+            stmt = stmt.where(DBCharacter.user_id == user_id)
+        
+        stmt = stmt.options(
+            selectinload(DBCharacter.profile),
+            selectinload(DBCharacter.dna),
+            selectinload(DBCharacter.versions),
+            selectinload(DBCharacter.scene_assignments)
         )
         result = await self.db.execute(stmt)
         char = result.scalar_one_or_none()
@@ -120,20 +126,30 @@ class CharacterMemoryService:
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def set_lock_status(self, character_id: uuid.UUID, is_locked: bool) -> DBCharacter:
-        character = await self.get_character_by_id(character_id)
+    async def set_lock_status(self, character_id: uuid.UUID, is_locked: bool, user_id: Optional[uuid.UUID] = None) -> Optional[DBCharacter]:
+        character = await self.get_character_by_id(character_id, user_id)
         if character:
             character.is_locked = is_locked
             await self.db.commit()
             CharacterCache.invalidate(str(character_id))
         return character
 
-    async def assign_to_scene(self, character_id: uuid.UUID, scene_id: uuid.UUID, pose: str = "Standing", expression: str = "Neutral") -> DBCharacterSceneAssignment:
+    async def assign_to_scene(
+        self, character_id: uuid.UUID, scene_id: uuid.UUID, pose: str = "Standing", expression: str = "Neutral", user_id: Optional[uuid.UUID] = None
+    ) -> Optional[DBCharacterSceneAssignment]:
+        character = await self.get_character_by_id(character_id, user_id)
+        if not character:
+            return None
+        from app.models.models import Scene, Project
+        if user_id:
+            scene_check = await self.db.execute(
+                select(Scene).join(Project, Scene.project_id == Project.id).where(Scene.id == scene_id, Project.user_id == user_id)
+            )
+            if not scene_check.scalar_one_or_none():
+                return None
         assignment = DBCharacterSceneAssignment(
             character_id=character_id,
-            scene_id=scene_id,
-            pose_in_scene=pose,
-            expression_in_scene=expression
+            scene_id=scene_id
         )
         self.db.add(assignment)
         await self.db.commit()

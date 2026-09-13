@@ -1,4 +1,4 @@
-﻿from uuid import UUID
+from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, get_current_user_id
@@ -25,4 +25,4 @@ async def get_render_status(
     db: AsyncSession = Depends(get_db)
 ):
     service = RenderService(db)
-    return await service.get_job_status(job_id)
+    return await service.get_job_status(job_id, current_user_id)

@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from datetime import datetime
 from sqlalchemy import (
     Column, String, Text, Integer, Float, Boolean, DateTime, ForeignKey, JSON
@@ -184,10 +184,8 @@ class DBCharacterSceneAssignment(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     character_id = Column(UUID(as_uuid=True), ForeignKey("characters.id", ondelete="CASCADE"), nullable=False, index=True)
     scene_id = Column(UUID(as_uuid=True), ForeignKey("scenes.id", ondelete="CASCADE"), nullable=False, index=True)
-    
-    appearance_number = Column(Integer, default=1)
-    pose_in_scene = Column(String(128), default="Standing")
-    expression_in_scene = Column(String(128), default="Neutral")
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
     character = relationship("DBCharacter", back_populates="scene_assignments")
 
@@ -200,8 +198,16 @@ class DBCharacterVersion(Base):
     character_id = Column(UUID(as_uuid=True), ForeignKey("characters.id", ondelete="CASCADE"), nullable=False, index=True)
     
     version_number = Column(Integer, nullable=False)
-    snapshot_dna = Column(JSON, nullable=False)
-    notes = Column(String(255), default="Version snapshot")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    dna_snapshot = Column("dna_snapshot", JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def snapshot_dna(self):
+        return self.dna_snapshot
+
+    @snapshot_dna.setter
+    def snapshot_dna(self, value):
+        self.dna_snapshot = value
 
     character = relationship("DBCharacter", back_populates="versions")

@@ -1,18 +1,24 @@
-﻿import pytest
+import pytest
 import asyncio
 from typing import AsyncGenerator
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from app.main import app
+from app.db.session import engine
+from app.core.rate_limit import _rate_limiter
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+@pytest.fixture(autouse=True)
+async def cleanup_after_test():
+    """Clean up DB connections and rate limiter after each test."""
+    _rate_limiter.reset()
+    yield
+    await engine.dispose()
+    _rate_limiter.reset()
 
 
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    async with AsyncClient(app=app, base_url="http://test") as c:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+

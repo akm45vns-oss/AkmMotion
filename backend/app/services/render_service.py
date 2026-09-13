@@ -1,4 +1,4 @@
-﻿from uuid import UUID
+from uuid import UUID
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
@@ -18,6 +18,9 @@ class RenderService:
 
     async def start_render_job(self, project_id: UUID, user_id_str: str) -> RenderJobResponse:
         user_id = UUID(user_id_str)
+        from app.core.dependencies import ensure_user_in_db
+        await ensure_user_in_db(self.db, user_id)
+
         project = await self.proj_repo.get_by_id(project_id, user_id)
         if not project:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
@@ -56,8 +59,12 @@ class RenderService:
         # Update job to completed
         await self.repo.update_progress(job_id, progress=100, status=RenderStatus.completed)
 
-    async def get_job_status(self, job_id: UUID) -> RenderJobResponse:
+    async def get_job_status(self, job_id: UUID, user_id_str: Optional[str] = None) -> RenderJobResponse:
         job = await self.repo.get_by_id(job_id)
         if not job:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Render job not found")
+        if user_id_str is not None:
+            user_uuid = UUID(str(user_id_str))
+            if job.user_id != user_uuid:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Render job not found")
         return RenderJobResponse.model_validate(job)
