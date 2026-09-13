@@ -34,6 +34,21 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 
 
+@app.on_event("startup")
+async def on_startup():
+    """Ensure all 28 database tables and schema are automatically created on startup."""
+    try:
+        import app.models.models
+        import app.models.character
+        from app.db.base import Base
+        from app.db.session import engine
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[Startup] All database tables verified / created successfully.")
+    except Exception as e:
+        print(f"[Startup] Notice during database auto-init: {e}")
+
+
 @app.get("/")
 async def root():
     return {
