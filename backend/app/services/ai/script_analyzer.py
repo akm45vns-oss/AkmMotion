@@ -32,17 +32,19 @@ class ScriptAnalyzerService:
             "CRITICAL RULES FOR `image_prompt` (HIGHEST PRIORITY):\n"
             "1. 'image_prompt' MUST ALWAYS BE 100% IN DESCRIPTIVE, VIVID CINEMATIC ENGLISH, regardless of the script's language.\n"
             "   Even if the script or narration is in Hindi, Spanish, or any other language, NEVER put non-English or Devanagari characters in 'image_prompt'.\n"
-            "2. VISUAL RELEVANCE TO STORY: Each scene's image prompt must accurately and specifically depict THAT scene's action and setting.\n"
-            "   - If the story is historical or cultural (e.g. ancient Indian kingdom, drought, village, prince), the visuals MUST accurately match that world (ancient mud houses, cracked dry earth, royal traditional robes, dhotis, turbans, flowing river), NOT modern Western clothes or generic 3D cartoons.\n"
-            "   - If the scene is an environment, landscape, object, or crowd shot (e.g. cracked parched soil, gushing water stream, celebration in village), describe that environment vividly without forcing a single person into every shot.\n"
-            "3. CHARACTER CONSISTENCY: If the story features recurring named characters, maintain consistent, period-appropriate appearance across their scenes, but ONLY include the character in scenes where they actually participate.\n"
+            "2. VISUAL RELEVANCE & AUTHENTIC CHARACTERS (MOST IMPORTANT):\n"
+            "   - If the story is set in India or has Indian characters (e.g. students, teachers, friends, villages, science fairs, festivals), ALWAYS explicitly specify: 'Indian students in authentic school uniforms', 'Indian teacher in modest classroom', 'five Indian friends assembling a solar water pump', 'Indian high school science fair stage', etc.\n"
+            "   - NEVER produce generic Western corridors, empty decaying hallways, or abstract architecture without the characters.\n"
+            "   - SUBJECT & ACTION FIRST: Every prompt must depict the specific people, their facial expressions, authentic clothing, and hands-on actions happening in that scene (e.g., students soldering wires, assembling solar pump model, principal speaking, holding a winning trophy, cheering together).\n"
+            "   - If the scene is an environment, landscape, or crowd shot, describe that specific environment vividly.\n"
+            "3. CHARACTER CONSISTENCY: If the story features recurring named characters, maintain consistent appearance across their scenes.\n"
             "4. NO TEXT: No text overlays, subtitles, watermarks, or speech bubbles in the image.\n"
             "\n"
             "Return ONLY a valid JSON object with key 'scenes' (array of scene objects). Each scene object MUST contain:\n"
             "- scene_number (int, 1-indexed)\n"
             "- narration (string: spoken voiceover in the ORIGINAL script language)\n"
             "- subtitle (string: bold, punchy uppercase caption, max 10 words)\n"
-            "- image_prompt (string: cinematic 9:16 vertical prompt in rich ENGLISH. Format: [Shot type], [Subject & Setting], [Action & Atmosphere], [Lighting], 9:16 vertical format, 8k resolution)\n"
+            "- image_prompt (string: cinematic 9:16 vertical prompt in rich ENGLISH. Format: [Shot type], [Subject & Setting with authentic cultural details], [Action & Atmosphere], [Lighting], 9:16 vertical format, 8k photorealistic)\n"
             "- shot_type (one of: wide_shot | medium_shot | close_up | extreme_close_up | over_shoulder | birds_eye | low_angle)\n"
             "- animation_style (one of: zoom | pan | fade | ken_burns | motion_blur | camera_push | camera_pull)\n"
             "- transition (one of: cut | fade | slide | wipe | zoom)\n"
@@ -52,11 +54,20 @@ class ScriptAnalyzerService:
         )
 
     def _build_user_prompt(self, script_text: str, style: str, language: str) -> str:
+        cultural_hint = ""
+        if re.search(r"[\u0900-\u097F]", script_text) or language.lower() in ["hi", "hindi", "hinglish"]:
+            cultural_hint = (
+                "\nCULTURAL CONTEXT REQUIREMENT: Indian story detected. "
+                "Ground all visuals in authentic Indian characters, realistic Indian school/classroom/village settings, "
+                "appropriate clothing (uniforms/kurtas), and active hands-on story actions. Avoid empty or Westernized stock scenes."
+            )
+
         return (
             f"Visual Style: {style}\n"
             f"Language: {language}\n"
             f"Target: 60-90 seconds total, 7-9 scenes\n"
             f"Script:\n{script_text}"
+            f"{cultural_hint}"
         )
 
     async def analyze_script(
@@ -170,14 +181,16 @@ class ScriptAnalyzerService:
         EMOTIONS      = ['🔥 HOOK','💡 CONTEXT','⚡ SECRET','🎬 DEEP DIVE','🚀 IMPACT','😱 SHOCK','🎯 PROOF','👉 CALL TO ACTION','✅ CLOSE']
 
         STYLE_VISUAL = {
-            "Cinematic":  "dramatic cinematic lighting, film grain, shallow depth of field, anamorphic lens flare",
-            "Vlog":       "warm natural daylight, hand-held feel, vibrant colors, lifestyle aesthetic",
-            "Anime":      "anime art style, vibrant colors, cel-shaded, manga panel composition",
-            "Explainer":  "clean bright studio lighting, professional corporate aesthetic",
-            "Story":      "golden-hour warm light, emotional close-ups, narrative atmosphere",
-            "Finance":    "clean corporate environment, professional lighting, trust-building composition",
+            "Cinematic":  "cinematic dramatic lighting, photorealistic 8k, film grain, masterpiece",
+            "Vlog":       "natural daylight, authentic lifestyle photography, vibrant colors, 8k",
+            "Anime":      "makoto shinkai anime style, vibrant cel-shaded, beautiful lighting",
+            "Explainer":  "cinematic documentary style, natural lighting, authentic subjects, highly detailed",
+            "Story":      "cinematic storytelling, warm golden-hour lighting, emotional narrative depth",
+            "Finance":    "clean modern aesthetic, crisp architectural lighting, premium detail",
         }
-        style_visual = STYLE_VISUAL.get(style, "cinematic atmospheric lighting, premium visual quality")
+        style_visual = STYLE_VISUAL.get(style, "cinematic atmospheric lighting, photorealistic 8k, ultra-detailed")
+
+        is_hindi = bool(re.search(r"[\u0900-\u097F]", script_text))
 
         scenes = []
         for idx, sentence in enumerate(sentences):
@@ -191,12 +204,13 @@ class ScriptAnalyzerService:
             ])[:80]
 
             clean = re.sub(r'[\U00010000-\U0010ffff]', '', sentence)
-            # Only keep English characters for image prompt to ensure diffusion model compatibility
             english_words = re.findall(r'[a-zA-Z0-9]+', clean)
             if len(english_words) >= 3:
                 subject_desc = " ".join(english_words[:12])
+            elif is_hindi:
+                subject_desc = f"authentic Indian characters in traditional environment engaged in the dramatic narrative moment, emotional human interaction"
             else:
-                subject_desc = f"atmospheric {style.lower()} scene capturing the dramatic narrative"
+                subject_desc = f"dramatic narrative moment capturing the scene action with key characters"
 
             image_prompt = (
                 f"{shot_label}. {subject_desc}. "

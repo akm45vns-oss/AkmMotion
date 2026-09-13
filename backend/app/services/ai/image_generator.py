@@ -99,17 +99,17 @@ class ImageGeneratorService:
         
         # Build prompt preserving CME character DNA attributes
         format_text = "vertical 9:16 format" if aspect_ratio == "9:16" else "portrait 3:4 format"
-        width = 1080 if aspect_ratio == "9:16" else 768
-        height = 1920 if aspect_ratio == "9:16" else 1024
+        width = 768 if aspect_ratio == "9:16" else 768
+        height = 1344 if aspect_ratio == "9:16" else 1024
 
         style_visual = {
-            "Cinematic": "cinematic lighting, film grain, anamorphic lens, masterpiece",
-            "Story": "cinematic storytelling, golden hour lighting, emotional narrative atmosphere",
-            "Vlog": "natural lighting, vibrant colors, lifestyle photography",
-            "Anime": "makoto shinkai anime style, vibrant cel shaded, beautiful lighting",
-            "Explainer": "clean professional studio lighting, clear composition",
-            "Finance": "clean corporate aesthetic, crisp architectural lighting",
-        }.get(style, "cinematic lighting, photorealistic 8k")
+            "Cinematic": "cinematic dramatic lighting, film grain, photorealistic 8k, masterpiece",
+            "Story": "cinematic storytelling, warm atmospheric lighting, emotional narrative depth, photorealistic",
+            "Vlog": "natural lighting, vibrant colors, authentic lifestyle photography, 8k",
+            "Anime": "makoto shinkai anime style, vibrant cel shaded, beautiful lighting, masterpiece",
+            "Explainer": "cinematic documentary style, natural lighting, authentic subjects, highly detailed",
+            "Finance": "clean modern aesthetic, crisp architectural lighting, premium detail",
+        }.get(style, "cinematic lighting, photorealistic 8k, highly detailed")
         
         full_ai_prompt = f"{clean_prompt}, {style_visual}, {format_text}, high quality, no text overlays"
         encoded_prompt = urllib.parse.quote(full_ai_prompt)
@@ -117,4 +117,4 @@ class ImageGeneratorService:
         # Unique seed derived from prompt hash to prevent image repetition across scenes
         seed = int(hashlib.md5(clean_prompt.encode("utf-8")).hexdigest(), 16) % 999999
         
-        return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model=flux&nologo=true&seed={seed}"
+        return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&model=flux-realism&nologo=true&seed={seed}"

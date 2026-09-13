@@ -297,13 +297,13 @@ async def regenerate_scene_image(
 
     # Style visual modifiers
     style_visual = {
-        "Cinematic": "dramatic cinematic lighting, film grain, anamorphic lens, masterpiece",
-        "Story":     "cinematic storytelling, golden hour lighting, emotional narrative atmosphere",
-        "Vlog":      "warm natural daylight, lifestyle aesthetic, vibrant colors",
-        "Anime":     "anime art style, vibrant colors, cel-shaded, manga panel",
-        "Explainer": "clean bright lighting, professional corporate aesthetic",
-        "Finance":   "clean corporate aesthetic, crisp architectural lighting",
-    }.get(style, "cinematic lighting, ultra detailed")
+        "Cinematic": "cinematic dramatic lighting, film grain, photorealistic 8k, masterpiece",
+        "Story":     "cinematic storytelling, warm atmospheric lighting, emotional narrative depth, photorealistic",
+        "Vlog":      "natural lighting, vibrant colors, authentic lifestyle photography, 8k",
+        "Anime":     "makoto shinkai anime style, vibrant cel shaded, beautiful lighting",
+        "Explainer": "cinematic documentary style, natural lighting, authentic subjects, highly detailed",
+        "Finance":   "clean modern aesthetic, crisp architectural lighting, premium detail",
+    }.get(style, "cinematic lighting, photorealistic 8k, highly detailed")
 
     full_prompt = (
         f"{clean_prompt}, {style_visual}, "
@@ -314,7 +314,7 @@ async def regenerate_scene_image(
     import time
     fresh_seed = int(hashlib.md5(f"{clean_prompt}{time.time()}".encode()).hexdigest(), 16) % 999999
     encoded = urllib.parse.quote(full_prompt)
-    new_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&model=flux&nologo=true&seed={fresh_seed}"
+    new_url = f"https://image.pollinations.ai/prompt/{encoded}?width=768&height=1344&model=flux-realism&nologo=true&seed={fresh_seed}"
 
     # Update or create image asset in DB
     image_asset = next((a for a in scene.assets if a.asset_type == AssetType.image), None)
@@ -369,9 +369,10 @@ async def generate_scene_prompt(
             "Write a single, highly detailed, evocative ENGLISH visual prompt describing what should be seen in the scene. "
             "Rules:\n"
             "1. Output ONLY the prompt string in English. No explanations, no prefixes, no quotes.\n"
-            "2. Describe: shot type, camera angle, subject, cultural/historical setting, specific action, lighting, textures, mood.\n"
-            "3. If the narration is in Hindi or another language, translate the visual meaning into an accurate visual depiction.\n"
-            "4. NEVER include dialogue, text overlays, or non-English characters."
+            "2. Focus heavily on the human characters, their expressive faces, authentic clothing, and hands-on actions or key story props.\n"
+            "3. If the narration is in Hindi or in an Indian cultural context, depict authentic Indian people, authentic Indian school/village/city surroundings, and culturally accurate clothing.\n"
+            "4. NEVER produce empty rooms or generic buildings if characters are actively participating in the story.\n"
+            "5. NEVER include dialogue, text overlays, subtitles, or non-English characters."
         )
         user_msg = f"Narration: {narration}\nVisual Style: {style}\nOverall Story Context: {context}"
         content = await groq.chat(

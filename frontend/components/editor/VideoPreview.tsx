@@ -6,16 +6,6 @@ import { Play, Pause, Volume2, Sparkles, Film, Mic2, Monitor, Square } from "luc
 import { motion, AnimatePresence } from "framer-motion";
 import { API_BASE_URL } from "@/lib/api/client";
 
-// ─── Fallback images ─────────────────────────────────────────────────────────
-const UNSPLASH_FALLBACKS = [
-  "https://picsum.photos/seed/fallback1/1080/1920",
-  "https://picsum.photos/seed/fallback2/1080/1920",
-  "https://picsum.photos/seed/fallback3/1080/1920",
-  "https://picsum.photos/seed/fallback4/1080/1920",
-  "https://picsum.photos/seed/fallback5/1080/1920",
-  "https://picsum.photos/seed/fallback6/1080/1920",
-];
-
 // ─── Aspect ratio frame dimensions ───────────────────────────────────────────
 const FRAME_DIMS: Record<string, { w: number; h: number }> = {
   "9:16": { w: 310, h: 551 },
@@ -49,7 +39,8 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [imageError, setImageError] = useState(false);
+  const [imgSrcOverrides, setImgSrcOverrides] = useState<Record<string, string>>({});
+  const [failedScenes, setFailedScenes] = useState<Record<string, boolean>>({});
 
   const activeScene =
     propScene ||
@@ -60,24 +51,30 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
   // ── Image URL resolution ──────────────────────────────────────────────────
   const getSceneImageUrl = (scene: any): string => {
     const imageAsset = scene?.assets?.find((a: any) => a.asset_type === "image");
-    const storedUrl = imageAsset?.url || "";
-    const isValidUrl =
-      storedUrl &&
-      !storedUrl.includes("unsplash.com") &&
-      !storedUrl.includes("picsum.photos") &&
-      !storedUrl.includes("placeholder");
-    if (isValidUrl) return storedUrl;
+    let storedUrl = imageAsset?.url || "";
+    if (storedUrl) {
+      // Optimize any legacy Pollinations URLs from flux 1080x1920 to fast flux-realism 768x1344
+      if (storedUrl.includes("pollinations.ai")) {
+        storedUrl = storedUrl
+          .replace(/model=flux(&|$)/, "model=flux-realism$1")
+          .replace("width=1080", "width=768")
+          .replace("height=1920", "height=1344");
+      }
+      return storedUrl;
+    }
     const rawPrompt = (scene?.image_prompt || scene?.narration || "").replace(/\*\*/g, "").trim();
-    const promptText = rawPrompt || `cinematic scene ${scene?.scene_number || 1}`;
+    const promptText = rawPrompt || `cinematic Indian story scene ${scene?.scene_number || 1}`;
     const encoded = encodeURIComponent(
       `photorealistic 8k render, ${promptText}, 9:16 vertical aspect ratio, cinematic lighting, ultra detailed`
     );
     const seed = ((scene?.scene_number || 1) * 73 + 1234) % 99999;
-    return `https://image.pollinations.ai/prompt/${encoded}?width=1080&height=1920&nologo=true&seed=${seed}`;
+    return `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1344&model=flux-realism&nologo=true&seed=${seed}`;
   };
 
-  const imageUrl = activeScene ? getSceneImageUrl(activeScene) : "";
-  const fallbackUrl = UNSPLASH_FALLBACKS[(activeScene?.scene_number || 1) - 1 % UNSPLASH_FALLBACKS.length];
+  const sceneKey = activeScene?.id || String(activeScene?.scene_number || 1);
+  const baseImageUrl = activeScene ? getSceneImageUrl(activeScene) : "";
+  const currentImageUrl = imgSrcOverrides[sceneKey] || baseImageUrl;
+  const isSceneImageFailed = Boolean(failedScenes[sceneKey]);
 
   // ── Voice & Karaoke engine ────────────────────────────────────────────────
   const pickVoice = useCallback((lang: string, gender: string): SpeechSynthesisVoice | null => {
@@ -369,20 +366,41 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
           {/* Background scene image with Ken Burns */}
           <div className="absolute inset-0 z-0 overflow-hidden bg-gray-950">
             <AnimatePresence mode="wait">
-              <motion.img
-                key={imageUrl + String(imageError)}
-                src={imageError ? fallbackUrl : imageUrl}
-                onError={() => setImageError(true)}
-                onLoad={() => setImageError(false)}
-                alt="Scene Visual"
-                initial={{ scale: 1.0, opacity: 0.7 }}
-                animate={{ scale: isPlaying ? 1.2 : 1.06, opacity: 1 }}
-                transition={{
-                  scale:   { duration: isPlaying ? 9 : 0.5, ease: "linear" },
-                  opacity: { duration: 0.4 },
-                }}
-                className="w-full h-full object-cover"
-              />
+              {!isSceneImageFailed && currentImageUrl ? (
+                <motion.img
+                  key={currentImageUrl}
+                  src={currentImageUrl}
+                  onError={() => {
+                    // Try backend proxy first if direct image fetch failed
+                    if (!currentImageUrl.includes("/ai/image-proxy") && currentImageUrl.startsWith("http")) {
+                      const proxyUrl = `${API_BASE_URL}/ai/image-proxy?url=${encodeURIComponent(currentImageUrl)}`;
+                      setImgSrcOverrides((prev) => ({ ...prev, [sceneKey]: proxyUrl }));
+                    } else {
+                      setFailedScenes((prev) => ({ ...prev, [sceneKey]: true }));
+                    }
+                  }}
+                  alt="Scene Visual"
+                  initial={{ scale: 1.0, opacity: 0.7 }}
+                  animate={{ scale: isPlaying ? 1.2 : 1.06, opacity: 1 }}
+                  transition={{
+                    scale:   { duration: isPlaying ? 9 : 0.5, ease: "linear" },
+                    opacity: { duration: 0.4 },
+                  }}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-indigo-950/80 via-slate-900 to-black text-center relative">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-3">
+                    <Film className="w-7 h-7 text-indigo-400" />
+                  </div>
+                  <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-1">
+                    Scene #{activeScene?.scene_number ?? 1}
+                  </span>
+                  <p className="text-xs text-gray-300 line-clamp-3 italic px-2">
+                    &ldquo;{activeScene?.narration || activeScene?.subtitle || "Narrative scene"}&rdquo;
+                  </p>
+                </div>
+              )}
             </AnimatePresence>
 
             {/* Cinematic gradient overlay */}
