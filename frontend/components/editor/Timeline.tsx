@@ -3,37 +3,30 @@
 import { useEditorStore } from "@/lib/stores/editorStore";
 import { Layers } from "lucide-react";
 
-const UNSPLASH_COLLECTIONS = [
-  "https://picsum.photos/seed/fallback1/1080/1920", // Scene 1
-  "https://picsum.photos/seed/fallback2/1080/1920", // Scene 2
-  "https://picsum.photos/seed/fallback3/1080/1920", // Scene 3
-  "https://picsum.photos/seed/fallback4/1080/1920", // Scene 4
-  "https://picsum.photos/seed/fallback5/1080/1920", // Scene 5
-  "https://picsum.photos/seed/fallback6/1080/1920", // Scene 6
-  "https://picsum.photos/seed/fallback7/1080/1920", // Scene 7
-  "https://picsum.photos/seed/fallback8/1080/1920", // Scene 8
-];
+import { API_BASE_URL } from "@/lib/api/client";
 
 export default function Timeline() {
   const { scenes, activeSceneIndex, activeSceneId, setActiveSceneId, setActiveSceneIndex } = useEditorStore();
 
   const getSceneImageUrl = (scene: any) => {
     const imageAsset = scene?.assets?.find((a: any) => a.asset_type === "image");
-    if (imageAsset?.url && !imageAsset.url.includes("picsum.photos")) {
-      return imageAsset.url;
+    let storedUrl = imageAsset?.url || "";
+    if (storedUrl) {
+      if (storedUrl.includes("pollinations.ai")) {
+        storedUrl = storedUrl
+          .replace(/model=flux(&|$)/, "model=flux-realism$1")
+          .replace("width=1080", "width=768")
+          .replace("height=1920", "height=1344");
+      }
+      return storedUrl;
     }
 
-    const rawPrompt = (scene?.image_prompt || scene?.narration || scene?.subtitle || "").replace(/\*\*/g, "").strip?.() || "";
-    const promptText = rawPrompt || `9:16 vertical 8k render scene ${scene?.scene_number || 1}`;
+    const rawPrompt = (scene?.image_prompt || scene?.narration || scene?.subtitle || "").replace(/\*\*/g, "").trim();
+    const promptText = rawPrompt || `Indian story scene ${scene?.scene_number || 1}`;
     
-    const encodedPrompt = encodeURIComponent(`photorealistic 8k render, ${promptText}, 9:16 vertical aspect ratio, cinematic lighting, 4k ultra detailed`);
+    const encodedPrompt = encodeURIComponent(`photorealistic 8k render, ${promptText}, 9:16 vertical aspect ratio, cinematic lighting, ultra detailed`);
     const seed = ((scene?.scene_number || 1) * 73 + 1234) % 99999;
-    return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1920&nologo=true&seed=${seed}`;
-  };
-
-  const getFallbackUnsplashUrl = (scene: any) => {
-    const num = (scene?.scene_number || 1) - 1;
-    return UNSPLASH_COLLECTIONS[num % UNSPLASH_COLLECTIONS.length];
+    return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1344&model=flux-realism&nologo=true&seed=${seed}`;
   };
 
   return (
@@ -73,7 +66,9 @@ export default function Timeline() {
                 src={imageUrl}
                 alt=""
                 onError={(e) => {
-                  e.currentTarget.src = getFallbackUnsplashUrl(scene);
+                  if (!e.currentTarget.src.includes("/ai/image-proxy") && imageUrl.startsWith("http")) {
+                    e.currentTarget.src = `${API_BASE_URL}/ai/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+                  }
                 }}
                 className="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity"
               />

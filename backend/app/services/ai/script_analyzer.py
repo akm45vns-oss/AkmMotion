@@ -38,12 +38,15 @@ class ScriptAnalyzerService:
             "   - SUBJECT & ACTION FIRST: Every prompt must depict the specific people, their facial expressions, authentic clothing, and hands-on actions happening in that scene (e.g., students soldering wires, assembling solar pump model, principal speaking, holding a winning trophy, cheering together).\n"
             "   - If the scene is an environment, landscape, or crowd shot, describe that specific environment vividly.\n"
             "3. CHARACTER CONSISTENCY: If the story features recurring named characters, maintain consistent appearance across their scenes.\n"
-            "4. NO TEXT: No text overlays, subtitles, watermarks, or speech bubbles in the image.\n"
+            "CRITICAL RULES FOR `subtitle` (HIGH PRIORITY):\n"
+            "- 'subtitle' MUST BE IN THE EXACT SAME LANGUAGE AS THE NARRATION!\n"
+            "- If the script/narration is in Hindi (or Devanagari script), the 'subtitle' MUST BE 100% IN HINDI (Devanagari script), e.g. 'पाँच पक्के दोस्त', 'विज्ञान प्रदर्शनी की चुनौती', 'शानदार जीत', NOT English!\n"
+            "- NEVER translate Hindi narration into English subtitles. If the narration is English, subtitle is English. If narration is Hindi, subtitle is Hindi.\n"
             "\n"
             "Return ONLY a valid JSON object with key 'scenes' (array of scene objects). Each scene object MUST contain:\n"
             "- scene_number (int, 1-indexed)\n"
             "- narration (string: spoken voiceover in the ORIGINAL script language)\n"
-            "- subtitle (string: bold, punchy uppercase caption, max 10 words)\n"
+            "- subtitle (string: punchy caption, max 8 words, IN THE SAME LANGUAGE as narration. Hindi for Hindi, English for English)\n"
             "- image_prompt (string: cinematic 9:16 vertical prompt in rich ENGLISH. Format: [Shot type], [Subject & Setting with authentic cultural details], [Action & Atmosphere], [Lighting], 9:16 vertical format, 8k photorealistic)\n"
             "- shot_type (one of: wide_shot | medium_shot | close_up | extreme_close_up | over_shoulder | birds_eye | low_angle)\n"
             "- animation_style (one of: zoom | pan | fade | ken_burns | motion_blur | camera_push | camera_pull)\n"
@@ -57,8 +60,9 @@ class ScriptAnalyzerService:
         cultural_hint = ""
         if re.search(r"[\u0900-\u097F]", script_text) or language.lower() in ["hi", "hindi", "hinglish"]:
             cultural_hint = (
-                "\nCULTURAL CONTEXT REQUIREMENT: Indian story detected. "
-                "Ground all visuals in authentic Indian characters, realistic Indian school/classroom/village settings, "
+                "\nCULTURAL CONTEXT & LANGUAGE REQUIREMENT: Indian Hindi story detected.\n"
+                "- SUBTITLE LANGUAGE: Since the script is in Hindi, ALL 'subtitle' fields MUST BE IN HINDI (Devanagari script), e.g. 'पाँच पक्के दोस्त', 'विज्ञान प्रदर्शनी की घोषणा'. DO NOT write English subtitles for Hindi narration!\n"
+                "- IMAGE PROMPTS: Ground all visuals in authentic Indian characters, realistic Indian school/classroom/village settings, "
                 "appropriate clothing (uniforms/kurtas), and active hands-on story actions. Avoid empty or Westernized stock scenes."
             )
 

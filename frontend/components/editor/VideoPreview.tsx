@@ -41,6 +41,7 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [imgSrcOverrides, setImgSrcOverrides] = useState<Record<string, string>>({});
   const [failedScenes, setFailedScenes] = useState<Record<string, boolean>>({});
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
   const activeScene =
     propScene ||
@@ -75,6 +76,10 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
   const baseImageUrl = activeScene ? getSceneImageUrl(activeScene) : "";
   const currentImageUrl = imgSrcOverrides[sceneKey] || baseImageUrl;
   const isSceneImageFailed = Boolean(failedScenes[sceneKey]);
+
+  useEffect(() => {
+    setIsImageLoading(true);
+  }, [currentImageUrl]);
 
   // ── Voice & Karaoke engine ────────────────────────────────────────────────
   const pickVoice = useCallback((lang: string, gender: string): SpeechSynthesisVoice | null => {
@@ -365,12 +370,22 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
         >
           {/* Background scene image with Ken Burns */}
           <div className="absolute inset-0 z-0 overflow-hidden bg-gray-950">
+            {isImageLoading && !isSceneImageFailed && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950/85 z-10 pointer-events-none transition-opacity">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center animate-pulse mb-2">
+                  <Film className="w-5 h-5 text-indigo-400" />
+                </div>
+                <span className="text-[11px] font-medium text-gray-400">Loading scene visual...</span>
+              </div>
+            )}
             <AnimatePresence mode="wait">
               {!isSceneImageFailed && currentImageUrl ? (
                 <motion.img
                   key={currentImageUrl}
                   src={currentImageUrl}
+                  onLoad={() => setIsImageLoading(false)}
                   onError={() => {
+                    setIsImageLoading(false);
                     // Try backend proxy first if direct image fetch failed
                     if (!currentImageUrl.includes("/ai/image-proxy") && currentImageUrl.startsWith("http")) {
                       const proxyUrl = `${API_BASE_URL}/ai/image-proxy?url=${encodeURIComponent(currentImageUrl)}`;
