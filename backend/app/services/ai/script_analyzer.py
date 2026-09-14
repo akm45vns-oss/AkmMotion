@@ -72,8 +72,35 @@ class ScriptAnalyzerService:
             target = min(sentence_count, adaptive)
             return max(4, target), adaptive
 
+    WORDS_PER_SECOND = 2.2
+    MIN_SCENE_DURATION = 3.0
+    MAX_SCENE_DURATION = 10.0
+
+    @classmethod
+    def calculate_estimated_duration(cls, word_count: int, scene_count: int = 1) -> float:
+        """
+        Harmonized duration calculator across frontend and backend:
+        - 2.2 words per second natural voiceover cadence
+        - Bounded between 3.0s and 10.0s per scene
+        """
+        if word_count <= 0:
+            return 0.0
+        scene_count = max(1, scene_count)
+        words_per_scene = word_count / scene_count
+        scene_dur = min(max(round(words_per_scene / cls.WORDS_PER_SECOND, 1), cls.MIN_SCENE_DURATION), cls.MAX_SCENE_DURATION)
+        return round(scene_dur * scene_count, 1)
+
     @staticmethod
+    def normalize_tokens(text: str) -> List[str]:
+        """
+        Extracts lowercase word tokens preserving unicode word characters (including Hindi).
+        Strips surrounding punctuation and symbols.
+        """
+        return re.findall(r"[\w\u0900-\u097F]+", text.lower())
+
+    @classmethod
     def validate_script_fidelity(
+        cls,
         original_script: str,
         scenes: List[Dict[str, Any]],
         max_scenes: int
@@ -81,9 +108,14 @@ class ScriptAnalyzerService:
         """
         Validates that the generated scenes preserve the user's script verbatim:
         1. Checks scene count does not exceed max_scenes.
-        2. Compares normalized tokens from original_script against concatenated scene narration.
-        3. Detects invented words/sentences (hallucinated content).
-        4. Detects omitted words (content dropped).
+        2. Invariant:
+           normalize_tokens(original_script) == normalize_tokens(scene_1.narration + " " + scene_2.narration + ...)
+           - Preserves exact word order
+           - Preserves duplicate words
+           - Zero missing words
+           - Zero extra/inserted words
+           - Zero reordered words
+        3. Ensures subtitle matches narration verbatim.
         """
         if not isinstance(scenes, list) or len(scenes) == 0:
             return False, "No scenes produced"
@@ -95,27 +127,33 @@ class ScriptAnalyzerService:
         if any(not n for n in narrations):
             return False, "One or more scenes have empty narration"
 
-        def tokenize(text: str) -> List[str]:
-            clean = re.sub(r"[^\w\s\u0900-\u097F]", " ", text.lower())
-            return clean.split()
-
-        orig_tokens = tokenize(original_script)
-        scene_tokens = tokenize(" ".join(narrations))
+        orig_tokens = cls.normalize_tokens(original_script)
+        concatenated_narration = " ".join(narrations)
+        scene_tokens = cls.normalize_tokens(concatenated_narration)
 
         if not orig_tokens:
             return True, "Valid"
 
-        orig_set = set(orig_tokens)
-        extra_words = [w for w in scene_tokens if w not in orig_set]
+        # The core invariant: exact list equality of normalized tokens
+        if orig_tokens != scene_tokens:
+            if len(scene_tokens) > len(orig_tokens):
+                extra_count = len(scene_tokens) - len(orig_tokens)
+                return False, f"Inserted/extra words detected: scenes contain {extra_count} extra token(s) (expected {len(orig_tokens)}, got {len(scene_tokens)})"
+            elif len(scene_tokens) < len(orig_tokens):
+                missing_count = len(orig_tokens) - len(scene_tokens)
+                return False, f"Omitted words detected: scenes missing {missing_count} token(s) (expected {len(orig_tokens)}, got {len(scene_tokens)})"
+            else:
+                for i, (ot, st) in enumerate(zip(orig_tokens, scene_tokens)):
+                    if ot != st:
+                        return False, f"Word mismatch or reordering at token {i + 1}: expected '{ot}', got '{st}'"
+                return False, "Normalized scene tokens do not match original script"
 
-        # Strict: 0 extra words for short scripts, max 1 extra token for longer text
-        allowed_extra = 0 if len(orig_tokens) <= 30 else 1
-        if len(extra_words) > allowed_extra:
-            return False, f"Invented words detected ({len(extra_words)}): {extra_words[:5]}"
-
-        # Check for substantial text omission
-        if len(orig_tokens) > 5 and len(scene_tokens) < 0.80 * len(orig_tokens):
-            return False, f"Substantial text omitted: generated {len(scene_tokens)} tokens from {len(orig_tokens)} original tokens"
+        # Sanitize subtitle to ensure it remains a faithful segment of that scene's narration
+        for s in scenes:
+            sub = str(s.get("subtitle", "")).strip()
+            narr = str(s.get("narration", "")).strip()
+            if not sub or cls.normalize_tokens(sub) != cls.normalize_tokens(narr):
+                s["subtitle"] = narr
 
         return True, "Valid"
 
@@ -302,11 +340,32 @@ class ScriptAnalyzerService:
         if target_scenes is None:
             target_scenes, _ = self.calculate_scene_count(clean_text)
 
-        target_scenes = max(1, min(target_scenes, len(raw)))
-
         if target_scenes == 1 or len(raw) == 1:
             sentence_groups = [" ".join(raw)]
         else:
+            # If we have fewer sentence units than target_scenes, partition by clause or contiguous word chunks
+            if len(raw) < target_scenes:
+                clauses = [
+                    s.strip()
+                    for s in re.split(r'(?<=[,;:\-—])\s+', clean_text)
+                    if s.strip()
+                ]
+                if len(clauses) >= target_scenes:
+                    raw = clauses
+                else:
+                    all_words = clean_text.split()
+                    if len(all_words) >= target_scenes:
+                        k, m = divmod(len(all_words), target_scenes)
+                        raw = []
+                        w_start = 0
+                        for i in range(target_scenes):
+                            w_end = w_start + k + (1 if i < m else 0)
+                            chunk = " ".join(all_words[w_start:w_end])
+                            if chunk:
+                                raw.append(chunk)
+                            w_start = w_end
+
+            target_scenes = max(1, min(target_scenes, len(raw)))
             k, m = divmod(len(raw), target_scenes)
             sentence_groups = []
             start = 0
@@ -347,7 +406,7 @@ class ScriptAnalyzerService:
         scenes = []
         for idx, sentence in enumerate(sentence_groups):
             words = sentence.split()
-            duration = min(max(round(len(words) / 2.1, 1), 3.0), 10.0)
+            duration = min(max(round(len(words) / self.WORDS_PER_SECOND, 1), self.MIN_SCENE_DURATION), self.MAX_SCENE_DURATION)
             shot_enum, shot_label = SHOT_TYPES[idx % len(SHOT_TYPES)]
 
             clean_words = re.sub(r'[\U00010000-\U0010ffff]', '', sentence)

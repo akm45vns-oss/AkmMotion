@@ -22,7 +22,28 @@ export default function NewProjectPage() {
 
   const words = scriptContent.trim() ? scriptContent.trim().split(/\s+/).filter(Boolean) : [];
   const wordCount = words.length;
-  const estimatedSeconds = wordCount > 0 ? Math.max(1, Math.round(wordCount / 2.5)) : 0;
+
+  // Harmonized with backend ScriptAnalyzerService pacing engine (2.2 words/sec, 3.0s-10.0s per scene)
+  const estimatedSeconds = (() => {
+    if (wordCount === 0) return 0;
+    let targetScenes = 1;
+    if (wordCount > 300) {
+      targetScenes = Math.min(10, Math.max(6, Math.ceil(wordCount / 50)));
+    } else if (wordCount > 180) {
+      targetScenes = 4;
+    } else if (wordCount > 100) {
+      targetScenes = 3;
+    } else if (wordCount > 50) {
+      targetScenes = 2;
+    } else if (wordCount > 20) {
+      targetScenes = 2;
+    } else {
+      targetScenes = 1;
+    }
+    const wordsPerScene = wordCount / targetScenes;
+    const sceneDuration = Math.min(Math.max(wordsPerScene / 2.2, 3.0), 10.0);
+    return Math.round(sceneDuration * targetScenes);
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

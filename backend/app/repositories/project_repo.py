@@ -57,7 +57,12 @@ class ProjectRepository:
 
         if script_content:
             word_count = len(script_content.split())
-            estimated_duration = max(1.0, round(word_count / 2.5, 1)) if word_count > 0 else 0.0  # ~150 words per min = 2.5 words/sec
+            if word_count > 0:
+                from app.services.ai.script_analyzer import ScriptAnalyzerService
+                target_scenes, _ = ScriptAnalyzerService.calculate_scene_count(script_content)
+                estimated_duration = ScriptAnalyzerService.calculate_estimated_duration(word_count, target_scenes)
+            else:
+                estimated_duration = 0.0
 
             script = Script(
                 project_id=project.id,

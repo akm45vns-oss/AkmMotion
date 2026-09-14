@@ -121,7 +121,7 @@ def test_validator_rejects_hallucinated_expansion():
     )
 
     assert is_valid is False, "Validator should have rejected hallucinated second sentence"
-    assert "Invented words detected" in reason
+    assert "extra words" in reason.lower() or "inserted" in reason.lower()
 
 
 def test_validator_rejects_exceeded_scene_count():
@@ -178,3 +178,122 @@ def test_calculate_scene_count_policy():
     # 150 words
     t, m = ScriptAnalyzerService.calculate_scene_count("word " * 150)
     assert m <= 4
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HARDENING REGRESSION TESTS: Exact Invariant & Token Fidelity
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_validator_rejects_duplicated_words():
+    """
+    Duplicated words that were not in the original script must be rejected.
+    """
+    original = "Focus on your breathing and relax completely."
+    scenes = [
+        {
+            "scene_number": 1,
+            "narration": "Focus focus on your breathing and relax completely.",
+            "subtitle": "Focus focus on your breathing and relax completely.",
+            "image_prompt": "Calm meditation space",
+        }
+    ]
+    is_valid, reason = ScriptAnalyzerService.validate_script_fidelity(original, scenes, max_scenes=1)
+    assert is_valid is False
+    assert "extra words" in reason.lower() or "inserted" in reason.lower()
+
+
+def test_validator_rejects_reordered_words():
+    """
+    Words must maintain exact sequence order. Swapping adjacent words must fail.
+    """
+    original = "Start your morning with cold water."
+    scenes = [
+        {
+            "scene_number": 1,
+            "narration": "Start morning your with cold water.",
+            "subtitle": "Start morning your with cold water.",
+            "image_prompt": "Morning kitchen glass of water",
+        }
+    ]
+    is_valid, reason = ScriptAnalyzerService.validate_script_fidelity(original, scenes, max_scenes=1)
+    assert is_valid is False
+    assert "mismatch" in reason.lower() or "reordering" in reason.lower()
+
+
+def test_validator_rejects_omitted_words():
+    """
+    Dropping any word from the user's script must fail validation.
+    """
+    original = "Exercise daily to maintain physical and mental strength."
+    scenes = [
+        {
+            "scene_number": 1,
+            "narration": "Exercise daily to maintain physical strength.",
+            "subtitle": "Exercise daily to maintain physical strength.",
+            "image_prompt": "Athlete training",
+        }
+    ]
+    is_valid, reason = ScriptAnalyzerService.validate_script_fidelity(original, scenes, max_scenes=1)
+    assert is_valid is False
+    assert "omitted" in reason.lower() or "missing" in reason.lower()
+
+
+def test_validator_rejects_inserted_words():
+    """
+    Inserting commentary, adjectives, or conversational fillers must fail validation.
+    """
+    original = "Consistency is the path to mastery."
+    scenes = [
+        {
+            "scene_number": 1,
+            "narration": "Consistency is really the true path to mastery.",
+            "subtitle": "Consistency is really the true path to mastery.",
+            "image_prompt": "Monk practicing calligraphy",
+        }
+    ]
+    is_valid, reason = ScriptAnalyzerService.validate_script_fidelity(original, scenes, max_scenes=1)
+    assert is_valid is False
+    assert "extra words" in reason.lower() or "inserted" in reason.lower()
+
+
+def test_validator_accepts_exact_multi_scene_reconstruction():
+    """
+    Concatenating all scene narrations in order must reconstruct 100% of original tokens.
+    """
+    original = "The sun rises over the Himalayas. Monks begin their morning chants in silence. The bells echo across the valley."
+    scenes = [
+        {
+            "scene_number": 1,
+            "narration": "The sun rises over the Himalayas.",
+            "subtitle": "The sun rises over the Himalayas.",
+            "image_prompt": "Sunrise over snowcapped mountain peaks",
+        },
+        {
+            "scene_number": 2,
+            "narration": "Monks begin their morning chants in silence.",
+            "subtitle": "Monks begin their morning chants in silence.",
+            "image_prompt": "Monks meditating in monastery hall",
+        },
+        {
+            "scene_number": 3,
+            "narration": "The bells echo across the valley.",
+            "subtitle": "The bells echo across the valley.",
+            "image_prompt": "Ancient brass temple bell swinging",
+        },
+    ]
+    is_valid, reason = ScriptAnalyzerService.validate_script_fidelity(original, scenes, max_scenes=3)
+    assert is_valid is True, f"Validation failed: {reason}"
+    assert reason == "Valid"
+
+
+def test_harmonized_duration_pacing():
+    """
+    Verify calculate_estimated_duration returns consistent, bounded values:
+    - 2 words -> 3.0s minimum
+    - 10 words -> ~4.5s
+    - 50 words / 2 scenes -> 20.0s (10.0s max per scene)
+    """
+    assert ScriptAnalyzerService.calculate_estimated_duration(0) == 0.0
+    assert ScriptAnalyzerService.calculate_estimated_duration(2, 1) == 3.0
+    assert ScriptAnalyzerService.calculate_estimated_duration(10, 1) == 4.5
+    assert ScriptAnalyzerService.calculate_estimated_duration(50, 2) == 20.0
