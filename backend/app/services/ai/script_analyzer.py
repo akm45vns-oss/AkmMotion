@@ -1,15 +1,18 @@
 import json
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from app.core.config import settings
 
 
 class ScriptAnalyzerService:
     """
-    Analyzes raw text script using Groq LLM (5-key round-robin, best free model)
-    or OpenAI as secondary, with a local heuristic fallback.
-    Targets 7-9 scenes for 60-90s YouTube Shorts / Instagram Reels.
-    Supports English & Native Hindi scripts.
+    Analyzes and segments raw text scripts into video scenes.
+    
+    NON-NEGOTIABLE CORE INVARIANT:
+    AkmMotion is a strict SCRIPT-TO-VIDEO generator.
+    The user's script is the authoritative, immutable source.
+    AI must NEVER invent, add, elaborate, expand, explain, or rewrite narration or dialogue.
+    The concatenated scene narrations must contain only the user's original words.
     """
 
     def __init__(self):
@@ -24,53 +27,151 @@ class ScriptAnalyzerService:
             print(f"[ScriptAnalyzer] GroqKeyManager unavailable: {e}")
             return None
 
-    def _build_system_prompt(self) -> str:
+    @staticmethod
+    def calculate_scene_count(script_text: str) -> Tuple[int, int]:
+        """
+        Calculates (target_scenes, max_scenes) strictly based on script word count and sentences.
+        Deterministic policy:
+        0–20 words    → 1 scene (or up to min(sentences, 3) if multiple complete sentences exist)
+        21–50 words   → 1–2 scenes (max 2)
+        51–100 words  → 2–3 scenes (max 3)
+        101–180 words → 3–4 scenes (max 4)
+        181–300 words → 4–6 scenes (max 6)
+        300+ words    → adaptive (~40-60 words/scene, capped at 10)
+        """
+        words = script_text.strip().split()
+        word_count = len(words)
+
+        raw_sentences = [
+            s.strip()
+            for s in re.split(r'(?<=[.!?।|\n])\s+', script_text)
+            if s.strip() and len(s.strip()) > 3
+        ]
+        sentence_count = max(1, len(raw_sentences))
+
+        if word_count <= 20:
+            if sentence_count == 1:
+                return 1, 1
+            else:
+                scenes = min(sentence_count, 3)
+                return scenes, scenes
+        elif word_count <= 50:
+            target = min(sentence_count, 2)
+            return max(1, target), 2
+        elif word_count <= 100:
+            target = min(sentence_count, 3)
+            return max(2, target), 3
+        elif word_count <= 180:
+            target = min(sentence_count, 4)
+            return max(3, target), 4
+        elif word_count <= 300:
+            target = min(sentence_count, 6)
+            return max(4, target), 6
+        else:
+            adaptive = min(10, max(6, (word_count + 49) // 50))
+            target = min(sentence_count, adaptive)
+            return max(4, target), adaptive
+
+    @staticmethod
+    def validate_script_fidelity(
+        original_script: str,
+        scenes: List[Dict[str, Any]],
+        max_scenes: int
+    ) -> Tuple[bool, str]:
+        """
+        Validates that the generated scenes preserve the user's script verbatim:
+        1. Checks scene count does not exceed max_scenes.
+        2. Compares normalized tokens from original_script against concatenated scene narration.
+        3. Detects invented words/sentences (hallucinated content).
+        4. Detects omitted words (content dropped).
+        """
+        if not isinstance(scenes, list) or len(scenes) == 0:
+            return False, "No scenes produced"
+
+        if len(scenes) > max_scenes:
+            return False, f"Scene count {len(scenes)} exceeds maximum allowed {max_scenes}"
+
+        narrations = [str(s.get("narration", "")).strip() for s in scenes]
+        if any(not n for n in narrations):
+            return False, "One or more scenes have empty narration"
+
+        def tokenize(text: str) -> List[str]:
+            clean = re.sub(r"[^\w\s\u0900-\u097F]", " ", text.lower())
+            return clean.split()
+
+        orig_tokens = tokenize(original_script)
+        scene_tokens = tokenize(" ".join(narrations))
+
+        if not orig_tokens:
+            return True, "Valid"
+
+        orig_set = set(orig_tokens)
+        extra_words = [w for w in scene_tokens if w not in orig_set]
+
+        # Strict: 0 extra words for short scripts, max 1 extra token for longer text
+        allowed_extra = 0 if len(orig_tokens) <= 30 else 1
+        if len(extra_words) > allowed_extra:
+            return False, f"Invented words detected ({len(extra_words)}): {extra_words[:5]}"
+
+        # Check for substantial text omission
+        if len(orig_tokens) > 5 and len(scene_tokens) < 0.80 * len(orig_tokens):
+            return False, f"Substantial text omitted: generated {len(scene_tokens)} tokens from {len(orig_tokens)} original tokens"
+
+        return True, "Valid"
+
+    def _build_system_prompt(self, target_scenes: int, max_scenes: int) -> str:
         return (
-            "You are an elite visual director and cinematographer for YouTube Shorts and Instagram Reels (1080x1920 vertical). "
-            "Your goal is to produce exactly 5 to 7 high-retention, visually stunning scenes totaling 45-75 seconds. "
+            "You are an elite visual director and cinematographer for vertical videos (1080x1920 vertical).\n"
+            "AkmMotion is a strict SCRIPT-TO-VIDEO generator where the user's script is the authoritative, immutable source.\n"
             "\n"
-            "CRITICAL RULES FOR `image_prompt` (HIGHEST PRIORITY):\n"
-            "1. 'image_prompt' MUST ALWAYS BE 100% IN DESCRIPTIVE, VIVID CINEMATIC ENGLISH, regardless of the script's language.\n"
-            "   Even if the script or narration is in Hindi, Spanish, or any other language, NEVER put non-English or Devanagari characters in 'image_prompt'.\n"
-            "2. VISUAL RELEVANCE & AUTHENTIC CHARACTERS (MOST IMPORTANT):\n"
-            "   - If the story is set in India or has Indian characters (e.g. students, teachers, friends, villages, science fairs, festivals), ALWAYS explicitly specify: 'Indian students in authentic school uniforms', 'Indian teacher in modest classroom', 'five Indian friends assembling a solar water pump', 'Indian high school science fair stage', etc.\n"
-            "   - NEVER produce generic Western corridors, empty decaying hallways, or abstract architecture without the characters.\n"
-            "   - SUBJECT & ACTION FIRST: Every prompt must depict the specific people, their facial expressions, authentic clothing, and hands-on actions happening in that scene (e.g., students soldering wires, assembling solar pump model, principal speaking, holding a winning trophy, cheering together).\n"
-            "   - If the scene is an environment, landscape, or crowd shot, describe that specific environment vividly.\n"
-            "3. CHARACTER CONSISTENCY: If the story features recurring named characters, maintain consistent appearance across their scenes.\n"
-            "CRITICAL RULES FOR `subtitle` (HIGH PRIORITY):\n"
-            "- 'subtitle' MUST BE IN THE EXACT SAME LANGUAGE AS THE NARRATION!\n"
-            "- If the script/narration is in Hindi (or Devanagari script), the 'subtitle' MUST BE 100% IN HINDI (Devanagari script), e.g. 'पाँच पक्के दोस्त', 'विज्ञान प्रदर्शनी की चुनौती', 'शानदार जीत', NOT English!\n"
-            "- NEVER translate Hindi narration into English subtitles. If the narration is English, subtitle is English. If narration is Hindi, subtitle is Hindi.\n"
+            "CRITICAL NON-NEGOTIABLE SCRIPT FIDELITY RULES (HIGHEST PRIORITY):\n"
+            "1. DO NOT INVENT, ADD, ELABORATE, EXPAND, EXPLAIN, OR REWRITE ANY NARRATION OR DIALOGUE.\n"
+            "2. DO NOT add hooks, intros, outros, transitions, tips, examples, or extra sentences.\n"
+            f"3. Produce exactly {target_scenes} scene(s) (Maximum allowed: {max_scenes}).\n"
+            "4. The 'narration' field in each scene MUST be an exact slice copied directly from the supplied script.\n"
+            "   Every word of the user's script must appear exactly once in sequence across the scenes. Zero added words.\n"
+            "5. The 'subtitle' field MUST be the exact words from that scene's narration in the exact same language.\n"
+            "6. You may ONLY be creative in the 'image_prompt' field (describing the visual scene, characters, setting, lighting in vivid 9:16 English).\n"
+            "\n"
+            "CRITICAL RULES FOR `image_prompt`:\n"
+            "- 'image_prompt' MUST ALWAYS BE 100% IN DESCRIPTIVE, VIVID CINEMATIC ENGLISH, regardless of script language.\n"
+            "- Ground visuals in authentic characters, setting, actions, and lighting.\n"
             "\n"
             "Return ONLY a valid JSON object with key 'scenes' (array of scene objects). Each scene object MUST contain:\n"
             "- scene_number (int, 1-indexed)\n"
-            "- narration (string: spoken voiceover in the ORIGINAL script language)\n"
-            "- subtitle (string: punchy caption, max 8 words, IN THE SAME LANGUAGE as narration. Hindi for Hindi, English for English)\n"
-            "- image_prompt (string: cinematic 9:16 vertical prompt in rich ENGLISH. Format: [Shot type], [Subject & Setting with authentic cultural details], [Action & Atmosphere], [Lighting], 9:16 vertical format, 8k photorealistic)\n"
+            "- narration (string: exact verbatim segment copied from original script)\n"
+            "- subtitle (string: exact words from narration)\n"
+            "- image_prompt (string: cinematic 9:16 vertical prompt in rich ENGLISH. Format: [Shot type], [Subject & Setting], [Action & Atmosphere], [Lighting], 9:16 vertical format, 8k photorealistic)\n"
             "- shot_type (one of: wide_shot | medium_shot | close_up | extreme_close_up | over_shoulder | birds_eye | low_angle)\n"
             "- animation_style (one of: zoom | pan | fade | ken_burns | motion_blur | camera_push | camera_pull)\n"
             "- transition (one of: cut | fade | slide | wipe | zoom)\n"
             "- camera_motion (one of: push | pull | static | pan_left | pan_right | tilt_up | tilt_down | orbit)\n"
             "- emotion (string: e.g. '🔥 Hook', '💡 Reveal', '⚡ Shock', '🚀 Climax', '👉 CTA')\n"
-            "- estimated_duration (float: between 6.0 and 10.0 seconds)\n"
+            "- estimated_duration (float: between 3.0 and 10.0 seconds)\n"
         )
 
-    def _build_user_prompt(self, script_text: str, style: str, language: str) -> str:
+    def _build_user_prompt(
+        self,
+        script_text: str,
+        style: str,
+        language: str,
+        target_scenes: int,
+        max_scenes: int
+    ) -> str:
         cultural_hint = ""
         if re.search(r"[\u0900-\u097F]", script_text) or language.lower() in ["hi", "hindi", "hinglish"]:
             cultural_hint = (
-                "\nCULTURAL CONTEXT & LANGUAGE REQUIREMENT: Indian Hindi story detected.\n"
-                "- SUBTITLE LANGUAGE: Since the script is in Hindi, ALL 'subtitle' fields MUST BE IN HINDI (Devanagari script), e.g. 'पाँच पक्के दोस्त', 'विज्ञान प्रदर्शनी की घोषणा'. DO NOT write English subtitles for Hindi narration!\n"
-                "- IMAGE PROMPTS: Ground all visuals in authentic Indian characters, realistic Indian school/classroom/village settings, "
-                "appropriate clothing (uniforms/kurtas), and active hands-on story actions. Avoid empty or Westernized stock scenes."
+                "\nCULTURAL CONTEXT: Indian Hindi story detected.\n"
+                "- Visual prompts must feature authentic Indian characters, settings, and clothing.\n"
+                "- Subtitles must be in the exact Hindi text from the script."
             )
 
         return (
             f"Visual Style: {style}\n"
             f"Language: {language}\n"
-            f"Target: 60-90 seconds total, 7-9 scenes\n"
-            f"Script:\n{script_text}"
+            f"Target: exactly {target_scenes} scene(s) (Maximum allowed: {max_scenes})\n"
+            f"Source Script (COPY VERBATIM into scene narrations, DO NOT ADD EXTRA WORDS):\n"
+            f"\"\"\"\n{script_text}\n\"\"\"\n"
             f"{cultural_hint}"
         )
 
@@ -80,51 +181,68 @@ class ScriptAnalyzerService:
         style: str = "Explainer",
         language: str = "en"
     ) -> List[Dict[str, Any]]:
-        """
-        Run the full analysis pipeline:
-        1. Groq llama-3.3-70b (5-key round-robin, best free quality)
-        2. OpenAI GPT-3.5 (if key available)
-        3. Local heuristic fallback (always works)
-        """
-        # ── 1. Groq (primary — best quality, free, 5-key rotation) ──────────
+        clean_text = script_text.strip()
+        if not clean_text:
+            return []
+
+        target_scenes, max_scenes = self.calculate_scene_count(clean_text)
+
+        # Fast path for very short scripts (<= 20 words and single sentence)
+        words = clean_text.split()
+        raw_sentences = [
+            s.strip()
+            for s in re.split(r'(?<=[.!?।|\n])\s+', clean_text)
+            if s.strip() and len(s.strip()) > 3
+        ]
+        if len(words) <= 20 and len(raw_sentences) <= 1:
+            print(f"[ScriptAnalyzer] Short script fast-path ({len(words)} words) -> 1 scene")
+            return self.deterministic_segmentation(clean_text, style=style, target_scenes=1)
+
+        # ── 1. Groq (primary — fast, free, 5-key rotation) ───────────────────
         groq = self._get_groq_manager()
         if groq:
-            result = await self._try_groq(groq, script_text, style, language)
+            result = await self._try_groq(groq, clean_text, style, language, target_scenes, max_scenes)
             if result:
                 return result
 
         # ── 2. OpenAI GPT-3.5 (secondary) ───────────────────────────────────
         if self.openai_api_key and self.openai_api_key.startswith("sk-"):
-            result = await self._try_openai(script_text, style, language)
+            result = await self._try_openai(clean_text, style, language, target_scenes, max_scenes)
             if result:
                 return result
 
-        # ── 3. Heuristic fallback (always works, no API) ─────────────────────
-        print("[ScriptAnalyzer] Using heuristic fallback (no LLM key available)")
-        return self._heuristic_split(script_text, style)
+        # ── 3. Deterministic fallback (100% faithful) ────────────────────────
+        print(f"[ScriptAnalyzer] Using deterministic segmentation for {target_scenes} scenes")
+        return self.deterministic_segmentation(clean_text, style=style, target_scenes=target_scenes)
 
     async def _try_groq(
         self,
         groq,
         script_text: str,
         style: str,
-        language: str
+        language: str,
+        target_scenes: int,
+        max_scenes: int
     ) -> Optional[List[Dict[str, Any]]]:
         try:
             content = await groq.chat_with_json(
                 messages=[
-                    {"role": "system", "content": self._build_system_prompt()},
-                    {"role": "user",   "content": self._build_user_prompt(script_text, style, language)},
+                    {"role": "system", "content": self._build_system_prompt(target_scenes, max_scenes)},
+                    {"role": "user",   "content": self._build_user_prompt(script_text, style, language, target_scenes, max_scenes)},
                 ],
                 model=groq.BEST_MODEL,
-                temperature=0.75,
+                temperature=0.3,  # Lower temperature for strict fidelity
                 max_tokens=4096,
             )
             data = json.loads(content)
             scenes = data.get("scenes", [])
-            if isinstance(scenes, list) and len(scenes) >= 4:
-                print(f"[ScriptAnalyzer] Groq produced {len(scenes)} scenes.")
-                return scenes
+            if isinstance(scenes, list) and len(scenes) >= 1:
+                is_valid, reason = self.validate_script_fidelity(script_text, scenes, max_scenes)
+                if is_valid:
+                    print(f"[ScriptAnalyzer] Groq produced {len(scenes)} valid scenes matching script fidelity.")
+                    return scenes
+                else:
+                    print(f"[ScriptAnalyzer] Groq output failed script fidelity validation: {reason}. Falling back to deterministic segmentation.")
         except Exception as e:
             print(f"[ScriptAnalyzer] Groq attempt failed: {e}")
         return None
@@ -133,7 +251,9 @@ class ScriptAnalyzerService:
         self,
         script_text: str,
         style: str,
-        language: str
+        language: str,
+        target_scenes: int,
+        max_scenes: int
     ) -> Optional[List[Dict[str, Any]]]:
         try:
             import openai
@@ -141,37 +261,66 @@ class ScriptAnalyzerService:
             response = await client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": self._build_system_prompt()},
-                    {"role": "user",   "content": self._build_user_prompt(script_text, style, language)},
+                    {"role": "system", "content": self._build_system_prompt(target_scenes, max_scenes)},
+                    {"role": "user",   "content": self._build_user_prompt(script_text, style, language, target_scenes, max_scenes)},
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.75,
+                temperature=0.3,
             )
             data = json.loads(response.choices[0].message.content)
             scenes = data.get("scenes", [])
-            if isinstance(scenes, list) and len(scenes) >= 4:
-                return scenes
+            if isinstance(scenes, list) and len(scenes) >= 1:
+                is_valid, reason = self.validate_script_fidelity(script_text, scenes, max_scenes)
+                if is_valid:
+                    return scenes
+                else:
+                    print(f"[ScriptAnalyzer] OpenAI output failed script fidelity validation: {reason}. Falling back to deterministic segmentation.")
         except Exception as e:
             print(f"[ScriptAnalyzer] OpenAI attempt failed: {e}")
         return None
 
-    # ─── Heuristic fallback ─────────────────────────────────────────────────
+    # ─── Deterministic Segmentation (Guaranteed 100% Fidelity) ─────────────
 
-    def _heuristic_split(self, script_text: str, style: str) -> List[Dict[str, Any]]:
+    def deterministic_segmentation(
+        self,
+        script_text: str,
+        style: str = "Explainer",
+        target_scenes: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        clean_text = script_text.strip()
+        if not clean_text:
+            return []
+
         raw = [
             s.strip()
-            for s in re.split(r'(?<=[.!?।|\n])\s+', script_text)
-            if s.strip() and len(s.strip()) > 3
+            for s in re.split(r'(?<=[.!?।|\n])\s+', clean_text)
+            if s.strip()
         ]
         if not raw:
-            raw = [script_text.strip()]
+            raw = [clean_text]
 
-        sentences = self._normalize_to_target_count(raw, target=8)
+        if target_scenes is None:
+            target_scenes, _ = self.calculate_scene_count(clean_text)
+
+        target_scenes = max(1, min(target_scenes, len(raw)))
+
+        if target_scenes == 1 or len(raw) == 1:
+            sentence_groups = [" ".join(raw)]
+        else:
+            k, m = divmod(len(raw), target_scenes)
+            sentence_groups = []
+            start = 0
+            for i in range(target_scenes):
+                end = start + k + (1 if i < m else 0)
+                group = " ".join(raw[start:end])
+                if group:
+                    sentence_groups.append(group)
+                start = end
 
         SHOT_TYPES = [
-            ("wide_shot",        "Extreme wide establishing shot"),
+            ("wide_shot",        "Wide establishing shot"),
             ("medium_shot",      "Medium shot waist up"),
-            ("close_up",         "Tight close-up face, emotional"),
+            ("close_up",         "Close-up face, emotional"),
             ("over_shoulder",    "Over-the-shoulder shot"),
             ("low_angle",        "Low-angle hero shot"),
             ("extreme_close_up", "Extreme close-up eyes, intense"),
@@ -179,10 +328,10 @@ class ScriptAnalyzerService:
             ("medium_shot",      "Medium shot dynamic angle"),
             ("wide_shot",        "Wide pull-back triumphant"),
         ]
-        ANIMATIONS    = ['camera_push','ken_burns','zoom','camera_pull','pan','motion_blur','camera_push','ken_burns','zoom']
-        TRANSITIONS   = ['cut','fade','zoom','cut','slide','cut','fade','wipe','cut']
-        CAM_MOTIONS   = ['push','tilt_up','pull','pan_left','orbit','pan_right','tilt_down','push','pull']
-        EMOTIONS      = ['🔥 HOOK','💡 CONTEXT','⚡ SECRET','🎬 DEEP DIVE','🚀 IMPACT','😱 SHOCK','🎯 PROOF','👉 CALL TO ACTION','✅ CLOSE']
+        ANIMATIONS  = ['ken_burns', 'pan', 'zoom', 'fade', 'camera_push', 'camera_pull', 'motion_blur']
+        TRANSITIONS = ['cut', 'fade', 'slide', 'wipe', 'zoom']
+        CAM_MOTIONS = ['push', 'pan_right', 'pan_left', 'pull', 'tilt_up', 'tilt_down', 'orbit']
+        EMOTIONS    = ['🔥 HOOK', '💡 CONTEXT', '⚡ KEY POINT', '🎬 SCENE', '🚀 CLIMAX', '👉 CTA']
 
         STYLE_VISUAL = {
             "Cinematic":  "cinematic dramatic lighting, photorealistic 8k, film grain, masterpiece",
@@ -193,28 +342,22 @@ class ScriptAnalyzerService:
             "Finance":    "clean modern aesthetic, crisp architectural lighting, premium detail",
         }
         style_visual = STYLE_VISUAL.get(style, "cinematic atmospheric lighting, photorealistic 8k, ultra-detailed")
-
-        is_hindi = bool(re.search(r"[\u0900-\u097F]", script_text))
+        is_hindi = bool(re.search(r"[\u0900-\u097F]", clean_text))
 
         scenes = []
-        for idx, sentence in enumerate(sentences):
-            words        = sentence.split()
-            duration     = min(max(round(len(words) / 2.1, 1), 7.0), 11.0)
+        for idx, sentence in enumerate(sentence_groups):
+            words = sentence.split()
+            duration = min(max(round(len(words) / 2.1, 1), 3.0), 10.0)
             shot_enum, shot_label = SHOT_TYPES[idx % len(SHOT_TYPES)]
 
-            formatted_subtitle = " ".join([
-                w.upper() if len(w) > 3 and i % 2 == 0 else w
-                for i, w in enumerate(words)
-            ])[:80]
-
-            clean = re.sub(r'[\U00010000-\U0010ffff]', '', sentence)
-            english_words = re.findall(r'[a-zA-Z0-9]+', clean)
+            clean_words = re.sub(r'[\U00010000-\U0010ffff]', '', sentence)
+            english_words = re.findall(r'[a-zA-Z0-9]+', clean_words)
             if len(english_words) >= 3:
                 subject_desc = " ".join(english_words[:12])
             elif is_hindi:
-                subject_desc = f"authentic Indian characters in traditional environment engaged in the dramatic narrative moment, emotional human interaction"
+                subject_desc = "authentic Indian characters in traditional setting engaged in the story moment"
             else:
-                subject_desc = f"dramatic narrative moment capturing the scene action with key characters"
+                subject_desc = "dramatic narrative moment capturing the scene action with characters"
 
             image_prompt = (
                 f"{shot_label}. {subject_desc}. "
@@ -225,7 +368,7 @@ class ScriptAnalyzerService:
             scenes.append({
                 "scene_number":       idx + 1,
                 "narration":          sentence,
-                "subtitle":           formatted_subtitle,
+                "subtitle":           sentence,
                 "image_prompt":       image_prompt,
                 "shot_type":          shot_enum,
                 "animation_style":    ANIMATIONS[idx % len(ANIMATIONS)],
@@ -237,16 +380,6 @@ class ScriptAnalyzerService:
 
         return scenes
 
-    def _normalize_to_target_count(self, sentences: List[str], target: int = 8) -> List[str]:
-        """Merge shortest adjacent pairs until at or below target count."""
-        while len(sentences) > target:
-            min_len = min(len(s) for s in sentences)
-            merged = False
-            for i, s in enumerate(sentences):
-                if len(s) == min_len and i + 1 < len(sentences):
-                    sentences[i] = s + " " + sentences.pop(i + 1)
-                    merged = True
-                    break
-            if not merged:
-                break
-        return sentences
+    def _heuristic_split(self, script_text: str, style: str) -> List[Dict[str, Any]]:
+        """Backward-compatible alias for deterministic_segmentation."""
+        return self.deterministic_segmentation(script_text, style=style)

@@ -1,4 +1,4 @@
-﻿from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -57,7 +57,7 @@ class ProjectRepository:
 
         if script_content:
             word_count = len(script_content.split())
-            estimated_duration = round(word_count / 2.5, 1)  # ~150 words per min = 2.5 words/sec
+            estimated_duration = max(1.0, round(word_count / 2.5, 1)) if word_count > 0 else 0.0  # ~150 words per min = 2.5 words/sec
 
             script = Script(
                 project_id=project.id,

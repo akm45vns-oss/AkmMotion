@@ -20,8 +20,9 @@ export default function NewProjectPage() {
   const [loadingMessage, setLoadingMessage] = useState("Creating Project...");
   const [error, setError] = useState<string | null>(null);
 
-  const wordCount = scriptContent.trim() ? scriptContent.trim().split(/\s+/).length : 0;
-  const estimatedSeconds = Math.round(wordCount / 2.5);
+  const words = scriptContent.trim() ? scriptContent.trim().split(/\s+/).filter(Boolean) : [];
+  const wordCount = words.length;
+  const estimatedSeconds = wordCount > 0 ? Math.max(1, Math.round(wordCount / 2.5)) : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +108,7 @@ export default function NewProjectPage() {
               <span>2. Script Text</span>
             </label>
             <div className="text-[11px] text-neutral-400 font-mono">
-              <span className="font-semibold text-[#F2F2F3]">{wordCount}</span> words · ~
+              <span className="font-semibold text-[#F2F2F3]">{wordCount}</span> {wordCount === 1 ? "word" : "words"} · ~
               <span className="font-semibold text-[#F2F2F3]">{estimatedSeconds}s</span> duration
             </div>
           </div>
@@ -117,7 +118,7 @@ export default function NewProjectPage() {
             required
             value={scriptContent}
             onChange={(e) => setScriptContent(e.target.value)}
-            placeholder="Paste your video script in English or Hindi here. The AI Director will deconstruct it into 5-7 vertical scenes, craft English visual prompts, and synthesize synchronized speech..."
+            placeholder="Paste your video script in English or Hindi here. The AI Director will segment it into vertical scenes, preserve your exact spoken words, and craft cinematic visual prompts..."
             className="input-base text-xs sm:text-sm leading-relaxed resize-none"
           />
         </div>
