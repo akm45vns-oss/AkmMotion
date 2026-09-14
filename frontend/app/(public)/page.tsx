@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { Sparkles, Play, ShieldCheck, Wand2, ArrowRight, UserCheck, Volume2, Film, Layers, Zap } from "lucide-react";
@@ -152,7 +152,7 @@ export default function LandingPage() {
             </div>
             <h3 className="text-lg font-bold text-white">Character Memory Engine (CME)</h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Stores character DNA in 11 PostgreSQL tables with fast &lt;100ms lookups. Injects locked character identity into every visual prompt.
+              Stores character DNA in PostgreSQL with fast &lt;100ms lookups. Injects locked character identity into every visual prompt.
             </p>
           </div>
 
@@ -160,9 +160,9 @@ export default function LandingPage() {
             <div className="w-12 h-12 rounded-2xl bg-purple-600/10 border border-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
               <Zap className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white">AI Script Intelligence</h3>
+            <h3 className="text-lg font-bold text-white">AI Scene Director</h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Calculates 0–100 Script Health Score across 5 dimensions with 1-click safe AI script cleaner and auto-improver for English & Hindi.
+              Deconstructs English &amp; Hindi scripts into cinematic visual scenes, camera motions, and synced Indian voiceover narration.
             </p>
           </div>
 
@@ -170,9 +170,9 @@ export default function LandingPage() {
             <div className="w-12 h-12 rounded-2xl bg-pink-600/10 border border-pink-500/20 text-pink-400 flex items-center justify-center font-bold">
               <Film className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-white">Client-Side Canvas Exporter</h3>
+            <h3 className="text-lg font-bold text-white">Server-Side FFmpeg Renderer</h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Encodes 1080×1920 vertical video frames, synced subtitle captions, and voice audio into downloadable MP4/WebM files inside a sleek smartphone preview frame.
+              Produces true production-grade 1080×1920 vertical MP4 videos with H.264 video, AAC audio, synced subtitles, and Ken Burns camera movements.
             </p>
           </div>
         </div>

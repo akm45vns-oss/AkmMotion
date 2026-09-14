@@ -7,8 +7,6 @@ import {
   Type, ImageIcon, Sliders, Mic2, RefreshCw, Sparkles,
   Film, Subtitles, Crop, Wand2, ChevronDown
 } from "lucide-react";
-import HealthScoreCard from "@/components/editor/HealthScoreCard";
-import AutoImproveModal from "@/components/editor/AutoImproveModal";
 import { API_BASE_URL } from "@/lib/api/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +59,6 @@ export default function SceneEditor() {
   const [regenLoading,   setRegenLoading]   = useState(false);
   const [regenSuccess,   setRegenSuccess]   = useState(false);
   const [enhanceLoading, setEnhanceLoading] = useState(false);
-  const [isAutoImproveOpen, setIsAutoImproveOpen] = useState(false);
 
   useEffect(() => {
     if (activeScene) {
@@ -165,10 +162,6 @@ export default function SceneEditor() {
       }
     };
 
-    const handleAcceptImprovedScript = (improvedText: string) => {
-    setNarration(improvedText);
-    setIsAutoImproveOpen(false);
-  };
 
   return (
     <div className="w-96 border-l border-gray-800/60 bg-[#0D1322] flex flex-col justify-between overflow-y-auto">
@@ -192,12 +185,6 @@ export default function SceneEditor() {
           </div>
         </div>
 
-        {/* ── Script Health Score ────────────────────────────────────────── */}
-        <HealthScoreCard
-          scriptText={fullProjectScript || narration}
-          language="Auto Detect"
-          onAutoImproveClick={() => setIsAutoImproveOpen(true)}
-        />
 
         {/* ─────────────── STYLE PRESET ──────────────────────────────────── */}
         <div className="space-y-2">
@@ -269,16 +256,13 @@ export default function SceneEditor() {
             <Crop className="w-3 h-3 text-cyan-400" />
             <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Aspect Ratio</span>
           </label>
-          <div className="aspect-toggle w-full">
-            {(["9:16", "1:1", "16:9"] as const).map((r) => (
-              <button
-                key={r}
-                onClick={() => setAspectRatio(r)}
-                className={`aspect-toggle-btn flex-1 ${aspectRatio === r ? "active" : ""}`}
-              >
-                {r === "9:16" ? "📱 9:16" : r === "1:1" ? "⬛ 1:1" : "🖥 16:9"}
-              </button>
-            ))}
+          <div className="px-3 py-2 rounded-xl bg-[#090D16] border border-gray-800/80 flex items-center justify-between text-xs">
+            <span className="font-semibold text-white flex items-center gap-2">
+              <span>📱</span> 9:16 Vertical (Shorts / Reels)
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+              1080×1920
+            </span>
           </div>
         </div>
 
@@ -420,14 +404,6 @@ export default function SceneEditor() {
         </button>
       </div>
 
-      {/* ── Auto-improve modal ────────────────────────────────────────────────── */}
-      {isAutoImproveOpen && (
-        <AutoImproveModal
-          originalScript={narration}
-          onAccept={handleAcceptImprovedScript}
-          onClose={() => setIsAutoImproveOpen(false)}
-        />
-      )}
     </div>
   );
 }

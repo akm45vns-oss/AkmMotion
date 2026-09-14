@@ -12,18 +12,12 @@ CREATE TYPE animation_style_type AS ENUM ('zoom', 'pan', 'fade', 'slide', 'paral
 CREATE TYPE transition_type AS ENUM ('cut', 'fade', 'slide', 'wipe', 'zoom');
 CREATE TYPE camera_motion_type AS ENUM ('push', 'pull', 'static', 'pan_left', 'pan_right', 'tilt_up', 'tilt_down');
 CREATE TYPE asset_type_enum AS ENUM ('image', 'audio', 'video', 'subtitle');
-CREATE TYPE voice_provider_enum AS ENUM ('elevenlabs', 'openai', 'google');
 CREATE TYPE gender_enum AS ENUM ('male', 'female', 'child');
-CREATE TYPE voice_style_enum AS ENUM ('narrator', 'calm', 'energetic', 'professional', 'storytelling');
 CREATE TYPE render_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled');
 CREATE TYPE image_provider_enum AS ENUM ('dalle', 'sdxl', 'midjourney');
 CREATE TYPE audio_type_enum AS ENUM ('narration', 'music', 'sfx');
 CREATE TYPE theme_enum AS ENUM ('dark', 'light', 'system');
-CREATE TYPE video_quality_enum AS ENUM ('720p', '1080p', '4k');
-CREATE TYPE sub_plan_enum AS ENUM ('free', 'pro', 'enterprise');
-CREATE TYPE sub_status_enum AS ENUM ('active', 'cancelled', 'past_due', 'trialing');
-CREATE TYPE credit_tx_type AS ENUM ('purchase', 'usage', 'refund', 'bonus');
-CREATE TYPE notification_type_enum AS ENUM ('render_started', 'render_complete', 'render_failed', 'export_complete');
+CREATE TYPE video_quality_enum AS ENUM ('720p', '1080p');
 CREATE TYPE export_format_enum AS ENUM ('mp4', 'webm');
 
 -- 1. users
@@ -105,33 +99,7 @@ CREATE TABLE IF NOT EXISTS scene_assets (
 );
 CREATE INDEX IF NOT EXISTS idx_scene_assets_scene_id ON scene_assets(scene_id);
 
--- 6. voices
-CREATE TABLE IF NOT EXISTS voices (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    provider voice_provider_enum NOT NULL DEFAULT 'openai',
-    external_voice_id VARCHAR(255) NOT NULL,
-    gender gender_enum NOT NULL DEFAULT 'male',
-    style voice_style_enum NOT NULL DEFAULT 'narrator',
-    language VARCHAR(10) NOT NULL DEFAULT 'en',
-    preview_url TEXT,
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
--- 7. templates
-CREATE TABLE IF NOT EXISTS templates (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    style VARCHAR(100) NOT NULL,
-    thumbnail_url TEXT,
-    config JSONB NOT NULL DEFAULT '{}'::jsonb,
-    is_public BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
 -- 8. render_jobs
 CREATE TABLE IF NOT EXISTS render_jobs (
@@ -194,7 +162,6 @@ CREATE TABLE IF NOT EXISTS audio (
     url TEXT NOT NULL,
     storage_path TEXT NOT NULL,
     duration FLOAT NOT NULL DEFAULT 0.0,
-    voice_id UUID REFERENCES voices(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -213,46 +180,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 13. subscriptions
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    plan sub_plan_enum NOT NULL DEFAULT 'free',
-    status sub_status_enum NOT NULL DEFAULT 'active',
-    stripe_subscription_id VARCHAR(255),
-    current_period_start TIMESTAMPTZ,
-    current_period_end TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
 
--- 14. credits
-CREATE TABLE IF NOT EXISTS credits (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    amount INTEGER NOT NULL,
-    transaction_type credit_tx_type NOT NULL,
-    description TEXT NOT NULL,
-    balance_after INTEGER NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_credits_user_id ON credits(user_id);
-
--- 15. notifications
-CREATE TABLE IF NOT EXISTS notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type notification_type_enum NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    message TEXT NOT NULL,
-    is_read BOOLEAN NOT NULL DEFAULT false,
-    metadata JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 
 -- 16. exports
 CREATE TABLE IF NOT EXISTS exports (
@@ -269,19 +197,7 @@ CREATE TABLE IF NOT EXISTS exports (
 );
 CREATE INDEX IF NOT EXISTS idx_exports_user_id ON exports(user_id);
 
--- 17. activity_logs
-CREATE TABLE IF NOT EXISTS activity_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    action VARCHAR(100) NOT NULL,
-    resource_type VARCHAR(100) NOT NULL,
-    resource_id UUID,
-    metadata JSONB,
-    ip_address INET,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
+
 
 -- 18. characters
 CREATE TABLE IF NOT EXISTS characters (

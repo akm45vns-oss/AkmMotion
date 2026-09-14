@@ -16,40 +16,10 @@ from app.core.dependencies import get_db, get_current_user_id
 from app.core.rate_limit import rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen, rate_limit_pipeline
 from app.schemas.project import ProjectResponse
 from app.services.ai_pipeline_service import AIPipelineService
-from app.services.ai.script_intelligence import ScriptHealthEvaluator, ScriptImprover
 from app.services.ai.subtitle_generator import SubtitleGeneratorService
 from app.services.ai.voice_generator import VoiceGeneratorService
 
 router = APIRouter(prefix="/ai", tags=["AI Pipeline"])
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Script Intelligence
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.post("/analyze-script")
-async def analyze_script_health(
-    payload: dict = Body(...),
-    current_user_id: str = Depends(get_current_user_id),
-    _: bool = Depends(rate_limit_script_ai)
-):
-    """Evaluates script health and returns 0-100 score + AI suggestions."""
-    script_text = payload.get("script", "")
-    language = payload.get("language", "Auto Detect")
-    report = ScriptHealthEvaluator.evaluate(script_text, language)
-    return report
-
-
-@router.post("/improve-script")
-async def auto_improve_script(
-    payload: dict = Body(...),
-    current_user_id: str = Depends(get_current_user_id),
-    _: bool = Depends(rate_limit_script_ai)
-):
-    """Auto-improves script grammar, flow, and hook while preserving meaning."""
-    script_text = payload.get("script", "")
-    result = ScriptImprover.improve(script_text)
-    return result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

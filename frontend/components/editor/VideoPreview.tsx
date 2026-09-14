@@ -507,21 +507,10 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
           )}
         </button>
 
-        {/* Aspect ratio quick pill */}
-        <div className="flex items-center gap-1 text-[10px]">
-          {(["9:16", "1:1", "16:9"] as const).map((r) => (
-            <button
-              key={r}
-              onClick={() => useEditorStore.getState().setAspectRatio(r)}
-              className={`px-2 py-1 rounded-md border font-semibold transition-all ${
-                aspectRatio === r
-                  ? "border-indigo-500 text-indigo-400 bg-indigo-500/10"
-                  : "border-gray-800 text-gray-500 hover:border-gray-700 hover:text-gray-400"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
+        {/* Canonical Aspect Ratio Badge */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0D1322] border border-gray-800 text-[10px] text-gray-300 font-medium">
+          <span className="text-indigo-400 font-semibold">📱 9:16</span>
+          <span className="text-gray-400">Vertical Shorts</span>
         </div>
       </div>
 

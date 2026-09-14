@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -45,7 +45,7 @@ export default function RegisterForm() {
           A
         </div>
         <h2 className="text-2xl font-bold text-white">Create your account</h2>
-        <p className="text-sm text-gray-400 mt-1">Get 100 free AI video generation credits instantly</p>
+        <p className="text-sm text-gray-400 mt-1">Start creating AI videos with character consistency</p>
       </div>
 
       {error && (

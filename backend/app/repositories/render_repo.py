@@ -15,7 +15,7 @@ class RenderRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_active_job(self, project_id: UUID, user_id: UUID) -> Optional[RenderJob]:
+    async def get_active_job(self, project_id: UUID, user_id: UUID, stale_timeout_seconds: int = 900) -> Optional[RenderJob]:
         query = (
             select(RenderJob)
             .where(
@@ -26,7 +26,26 @@ class RenderRepository:
             .order_by(RenderJob.created_at.desc())
         )
         result = await self.db.execute(query)
-        return result.scalars().first()
+        job = result.scalars().first()
+        if not job:
+            return None
+
+        # Stale job auto-recovery: If active job hasn't progressed in > stale_timeout_seconds,
+        # fail it so it does not permanently deadlock new render jobs on this project.
+        check_time = job.updated_at or job.started_at or job.created_at
+        if check_time:
+            if check_time.tzinfo is None:
+                check_time = check_time.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - check_time).total_seconds()
+            if age > stale_timeout_seconds:
+                job.status = RenderStatus.failed
+                job.completed_at = datetime.now(timezone.utc)
+                job.error_message = "Render timed out or worker process was restarted. Please try again."
+                await self.db.commit()
+                await self.db.refresh(job)
+                return None
+
+        return job
 
     async def get_video_by_job(self, job_id: UUID) -> Optional[Video]:
         query = select(Video).where(Video.render_job_id == job_id).order_by(Video.created_at.desc())
@@ -82,7 +101,7 @@ class RenderRepository:
             project_id=project_id,
             render_job_id=job_id,
             url=video_url,
-            storage_path=f"videos/{project_id}.mp4",
+            storage_path=f"videos/{job_id}.mp4",
             duration=duration,
             width=1080,
             height=1920,

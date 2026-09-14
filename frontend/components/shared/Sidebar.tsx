@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -8,7 +8,6 @@ import {
   Film, 
   UserCheck,
   Settings, 
-  BarChart3, 
   Sparkles,
   LogOut 
 } from "lucide-react";
@@ -19,7 +18,6 @@ const navigation = [
   { name: "New Video", href: "/projects/new", icon: FolderPlus, highlight: true },
   { name: "Projects", href: "/projects", icon: Film },
   { name: "Character Studio", href: "/characters", icon: UserCheck },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -77,18 +75,8 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* User / Credits Footer */}
+      {/* User Footer */}
       <div className="p-4 border-t border-gray-800/80">
-        <div className="p-3 rounded-xl bg-[#0D1322] border border-gray-800 mb-3">
-          <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
-            <span>Free Credits</span>
-            <span className="font-semibold text-indigo-400">100 / 100</span>
-          </div>
-          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 w-full" />
-          </div>
-        </div>
-
         <button
           onClick={logout}
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 text-sm font-medium transition-all"

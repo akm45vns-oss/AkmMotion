@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { Sparkles, ArrowRight, Video, Volume2, Type } from "lucide-react";
 import StyleSelector from "@/components/project/StyleSelector";
 import VoiceSelector from "@/components/project/VoiceSelector";
-import HealthScoreCard from "@/components/editor/HealthScoreCard";
-import AutoImproveModal from "@/components/editor/AutoImproveModal";
 import { projectsApi } from "@/lib/api/projects";
 import { aiApi } from "@/lib/api/ai";
 
@@ -21,7 +19,6 @@ export default function NewProjectPage() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Creating Project...");
   const [error, setError] = useState<string | null>(null);
-  const [isAutoImproveOpen, setIsAutoImproveOpen] = useState(false);
 
   const wordCount = scriptContent.trim() ? scriptContent.trim().split(/\s+/).length : 0;
   const estimatedSeconds = Math.round(wordCount / 2.5);
@@ -69,10 +66,6 @@ export default function NewProjectPage() {
     }
   };
 
-  const handleAcceptImprovedScript = (improvedText: string) => {
-    setScriptContent(improvedText);
-    setIsAutoImproveOpen(false);
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -83,7 +76,7 @@ export default function NewProjectPage() {
           Create New AI Video Project
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          Paste your script, analyze AI Script Health Score, select voiceover, and generate your YouTube Shorts.
+          Paste your script, select style and voiceover, and let AI generate your 9:16 vertical video scenes.
         </p>
       </div>
 
@@ -127,20 +120,9 @@ export default function NewProjectPage() {
             required
             value={scriptContent}
             onChange={(e) => setScriptContent(e.target.value)}
-            placeholder="Paste your video script here in English or Hindi... AI will analyze script health score, optimize flow, synthesize voiceover, and render subtitles."
+            placeholder="Paste your video script here in English or Hindi... AI will segment scenes, synthesize natural voiceover, and prepare for 1080x1920 MP4 rendering."
             className="w-full px-4 py-3 rounded-xl bg-[#090D16] border border-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
           />
-
-          {/* AI Script Health Score & One-Click Auto-Improve Section */}
-          {scriptContent.trim().length > 0 && (
-            <div className="pt-2">
-              <HealthScoreCard
-                scriptText={scriptContent}
-                language="Auto Detect"
-                onAutoImproveClick={() => setIsAutoImproveOpen(true)}
-              />
-            </div>
-          )}
         </div>
 
         {/* Visual Style Selection */}
@@ -183,14 +165,6 @@ export default function NewProjectPage() {
         </div>
       </form>
 
-      {/* Auto Improve Side-by-Side Comparison Modal */}
-      {isAutoImproveOpen && (
-        <AutoImproveModal
-          originalScript={scriptContent}
-          onAccept={handleAcceptImprovedScript}
-          onClose={() => setIsAutoImproveOpen(false)}
-        />
-      )}
     </div>
   );
 }

@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles, Film, Clock, Coins, Plus, Play } from "lucide-react";
+import { Sparkles, Film, CheckCircle2, FolderSync, Plus, Play } from "lucide-react";
 import { projectsApi, Project } from "@/lib/api/projects";
 
 export default function DashboardPage() {
@@ -16,6 +16,9 @@ export default function DashboardPage() {
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, []);
+
+  const completedCount = projects.filter((p) => p.status === "completed").length;
+  const draftCount = projects.filter((p) => p.status !== "completed").length;
 
   return (
     <div className="space-y-8">
@@ -56,22 +59,22 @@ export default function DashboardPage() {
         </div>
 
         <div className="p-5 rounded-2xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-purple-600/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-            <Coins className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">100</div>
-            <div className="text-xs text-gray-400">Available Credits</div>
+            <div className="text-2xl font-bold text-white">{completedCount}</div>
+            <div className="text-xs text-gray-400">Completed Videos</div>
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-pink-600/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
-            <Clock className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-xl bg-amber-600/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <FolderSync className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">0s</div>
-            <div className="text-xs text-gray-400">Total Rendered Duration</div>
+            <div className="text-2xl font-bold text-white">{draftCount}</div>
+            <div className="text-xs text-gray-400">In Progress / Drafts</div>
           </div>
         </div>
       </div>

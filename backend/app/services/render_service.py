@@ -177,6 +177,24 @@ class RenderService:
             if job.user_id != user_uuid:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Render job not found")
 
+        # Stale job auto-recovery: If a job in pending/processing hasn't progressed in > 15 minutes,
+        # mark it failed so clients receive an actionable final state rather than hanging indefinitely.
+        if job.status in [RenderStatus.pending, RenderStatus.processing]:
+            from datetime import datetime, timezone
+            check_time = job.updated_at or job.started_at or job.created_at
+            if check_time:
+                if check_time.tzinfo is None:
+                    check_time = check_time.replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - check_time).total_seconds()
+                if age > 900:  # 15 minutes
+                    await self.repo.update_progress(
+                        job.id,
+                        progress=job.progress,
+                        status=RenderStatus.failed,
+                        error_message="Render timed out or worker process was restarted. Please try again."
+                    )
+                    job = await self.repo.get_by_id(job_id)
+
         resp = RenderJobResponse.model_validate(job)
         video = await self.repo.get_video_by_job(job.id)
         if video:

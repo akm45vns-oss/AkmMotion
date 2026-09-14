@@ -66,22 +66,10 @@ class AssetType(str, enum.Enum):
     video = "video"
     subtitle = "subtitle"
 
-class VoiceProvider(str, enum.Enum):
-    elevenlabs = "elevenlabs"
-    openai = "openai"
-    google = "google"
-
 class Gender(str, enum.Enum):
     male = "male"
     female = "female"
     child = "child"
-
-class VoiceStyle(str, enum.Enum):
-    narrator = "narrator"
-    calm = "calm"
-    energetic = "energetic"
-    professional = "professional"
-    storytelling = "storytelling"
 
 class RenderStatus(str, enum.Enum):
     pending = "pending"
@@ -108,30 +96,6 @@ class ThemeMode(str, enum.Enum):
 class VideoQuality(str, enum.Enum):
     res_720p = "720p"
     res_1080p = "1080p"
-    res_4k = "4k"
-
-class SubPlan(str, enum.Enum):
-    free = "free"
-    pro = "pro"
-    enterprise = "enterprise"
-
-class SubStatus(str, enum.Enum):
-    active = "active"
-    cancelled = "cancelled"
-    past_due = "past_due"
-    trialing = "trialing"
-
-class CreditTransactionType(str, enum.Enum):
-    purchase = "purchase"
-    usage = "usage"
-    refund = "refund"
-    bonus = "bonus"
-
-class NotificationType(str, enum.Enum):
-    render_started = "render_started"
-    render_complete = "render_complete"
-    render_failed = "render_failed"
-    export_complete = "export_complete"
 
 class ExportFormat(str, enum.Enum):
     mp4 = "mp4"
@@ -161,9 +125,6 @@ class User(Base):
 
     projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
-    credits = relationship("Credit", back_populates="user", cascade="all, delete-orphan")
-    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 
 # 2. Project
@@ -238,30 +199,7 @@ class SceneAsset(Base):
     scene = relationship("Scene", back_populates="assets")
 
 
-# 6. Voice
-class Voice(Base):
-    __tablename__ = "voices"
 
-    name = Column(String(255), nullable=False)
-    provider = Column(pg_enum(VoiceProvider, "voice_provider_enum"), nullable=False, default=VoiceProvider.openai)
-    external_voice_id = Column(String(255), nullable=False)
-    gender = Column(pg_enum(Gender, "gender_enum"), nullable=False, default=Gender.male)
-    style = Column(pg_enum(VoiceStyle, "voice_style_enum"), nullable=False, default=VoiceStyle.narrator)
-    language = Column(String(10), nullable=False, default="en")
-    preview_url = Column(Text, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True)
-
-
-# 7. Template
-class Template(Base):
-    __tablename__ = "templates"
-
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    style = Column(String(100), nullable=False)
-    thumbnail_url = Column(Text, nullable=True)
-    config = Column(JSONB, nullable=False, default={})
-    is_public = Column(Boolean, nullable=False, default=True)
 
 
 # 8. RenderJob
@@ -322,7 +260,6 @@ class Audio(Base):
     url = Column(Text, nullable=False)
     storage_path = Column(Text, nullable=False)
     duration = Column(Float, nullable=False, default=0.0)
-    voice_id = Column(UUID(as_uuid=True), ForeignKey("voices.id", ondelete="SET NULL"), nullable=True)
 
 
 # 12. UserSettings
@@ -339,45 +276,7 @@ class UserSettings(Base):
     user = relationship("User", back_populates="settings")
 
 
-# 13. Subscription
-class Subscription(Base):
-    __tablename__ = "subscriptions"
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    plan = Column(pg_enum(SubPlan, "sub_plan_enum"), nullable=False, default=SubPlan.free)
-    status = Column(pg_enum(SubStatus, "sub_status_enum"), nullable=False, default=SubStatus.active)
-    stripe_subscription_id = Column(String(255), nullable=True, index=True)
-    current_period_start = Column(DateTime(timezone=True), nullable=True)
-    current_period_end = Column(DateTime(timezone=True), nullable=True)
-
-    user = relationship("User", back_populates="subscriptions")
-
-
-# 14. Credit
-class Credit(Base):
-    __tablename__ = "credits"
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    amount = Column(Integer, nullable=False)
-    transaction_type = Column(pg_enum(CreditTransactionType, "credit_tx_type"), nullable=False)
-    description = Column(Text, nullable=False)
-    balance_after = Column(Integer, nullable=False)
-
-    user = relationship("User", back_populates="credits")
-
-
-# 15. Notification
-class Notification(Base):
-    __tablename__ = "notifications"
-
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    type = Column(pg_enum(NotificationType, "notification_type_enum"), nullable=False)
-    title = Column(String(255), nullable=False)
-    message = Column(Text, nullable=False)
-    is_read = Column(Boolean, nullable=False, default=False)
-    metadata_json = Column("metadata", JSONB, nullable=True)
-
-    user = relationship("User", back_populates="notifications")
 
 
 # 16. Export
@@ -393,16 +292,7 @@ class Export(Base):
     download_count = Column(Integer, nullable=False, default=0)
 
 
-# 17. ActivityLog
-class ActivityLog(Base):
-    __tablename__ = "activity_logs"
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    action = Column(String(100), nullable=False)
-    resource_type = Column(String(100), nullable=False)
-    resource_id = Column(UUID(as_uuid=True), nullable=True)
-    metadata_json = Column("metadata", JSONB, nullable=True)
-    ip_address = Column(INET, nullable=True)
 
 
 # 18. Character (CME canonical model)

@@ -258,28 +258,32 @@ async def test_7_invalid_and_expired_jwt_rejected(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_8_ai_endpoints_rate_limiting_isolated(client: AsyncClient):
     """8. Test that rate limits are enforced per session and do not cause crosstalk"""
+    from unittest.mock import patch, AsyncMock
     user_a = str(uuid4())
     user_b = str(uuid4())
 
-    # User A makes 21 rapid requests (limit is 20 for script AI)
-    statuses_a = []
-    for _ in range(22):
-        res = await client.post(
-            "/api/v1/ai/analyze-script",
+    with patch("app.services.ai.script_analyzer.ScriptAnalyzerService.analyze_script", new_callable=AsyncMock) as mock_analyze:
+        mock_analyze.return_value = [{"scene_number": 1, "narration": "mock"}]
+
+        # User A makes 21 rapid requests (limit is 20 for script AI)
+        statuses_a = []
+        for _ in range(22):
+            res = await client.post(
+                "/api/v1/ai/generate-scenes",
+                json={"script": "Test script", "language": "en"},
+                cookies={GUEST_SESSION_COOKIE: user_a}
+            )
+            statuses_a.append(res.status_code)
+
+        assert 429 in statuses_a
+
+        # User B with a different session ID should NOT be blocked (rate limiting is isolated)
+        res_b = await client.post(
+            "/api/v1/ai/generate-scenes",
             json={"script": "Test script", "language": "en"},
-            cookies={GUEST_SESSION_COOKIE: user_a}
+            cookies={GUEST_SESSION_COOKIE: user_b}
         )
-        statuses_a.append(res.status_code)
-
-    assert 429 in statuses_a
-
-    # User B with a different session ID should NOT be blocked (rate limiting is isolated)
-    res_b = await client.post(
-        "/api/v1/ai/analyze-script",
-        json={"script": "Test script", "language": "en"},
-        cookies={GUEST_SESSION_COOKIE: user_b}
-    )
-    assert res_b.status_code == 200
+        assert res_b.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -428,99 +432,106 @@ async def test_14_proxy_ip_rate_limiting_isolated(client: AsyncClient):
     proxy_client_1 = "198.51.100.10"
     proxy_client_2 = "198.51.100.20"
 
-    # Client 1 (without cookies, tracked by proxy IP) exhausts rate limit
-    for _ in range(22):
+    from unittest.mock import patch, AsyncMock
+    with patch("app.services.ai.script_analyzer.ScriptAnalyzerService.analyze_script", new_callable=AsyncMock) as mock_analyze:
+        mock_analyze.return_value = [{"scene_number": 1, "narration": "mock"}]
+
+        # Client 1 (without cookies, tracked by proxy IP) exhausts rate limit
+        for _ in range(22):
+            client.cookies.clear()
+            await client.post(
+                "/api/v1/ai/generate-scenes",
+                json={"script": "Test script", "language": "en"},
+                headers={"X-Forwarded-For": f"{proxy_client_1}, 10.0.0.1"}
+            )
+
+        # Client 1 should be rate limited by its IP
         client.cookies.clear()
-        await client.post(
-            "/api/v1/ai/analyze-script",
+        res_1 = await client.post(
+            "/api/v1/ai/generate-scenes",
             json={"script": "Test script", "language": "en"},
             headers={"X-Forwarded-For": f"{proxy_client_1}, 10.0.0.1"}
         )
+        assert res_1.status_code == 429
 
-    # Client 1 should be rate limited by its IP
-    client.cookies.clear()
-    res_1 = await client.post(
-        "/api/v1/ai/analyze-script",
-        json={"script": "Test script", "language": "en"},
-        headers={"X-Forwarded-For": f"{proxy_client_1}, 10.0.0.1"}
-    )
-    assert res_1.status_code == 429
+        # Client 2 behind the same reverse proxy (different client IP) should NOT be blocked
+        client.cookies.clear()
+        res_2 = await client.post(
+            "/api/v1/ai/generate-scenes",
+            json={"script": "Test script", "language": "en"},
+            headers={"X-Forwarded-For": f"{proxy_client_2}, 10.0.0.1"}
+        )
+        assert res_2.status_code == 200
 
-    # Client 2 behind the same reverse proxy (different client IP) should NOT be blocked
-    client.cookies.clear()
-    res_2 = await client.post(
-        "/api/v1/ai/analyze-script",
-        json={"script": "Test script", "language": "en"},
-        headers={"X-Forwarded-For": f"{proxy_client_2}, 10.0.0.1"}
-    )
-    assert res_2.status_code == 200
-
-    # Also test NAT scenario: Client 3 is behind the SAME NAT IP as Client 1 (198.51.100.10),
-    # but has a distinct guest session cookie - it must NOT collapse into Client 1's exhausted IP bucket!
-    guest_3_id = str(uuid4())
-    res_3 = await client.post(
-        "/api/v1/ai/analyze-script",
-        json={"script": "Test script", "language": "en"},
-        headers={"X-Forwarded-For": f"{proxy_client_1}, 10.0.0.1"},
-        cookies={GUEST_SESSION_COOKIE: guest_3_id}
-    )
-    assert res_3.status_code == 200
+        # Also test NAT scenario: Client 3 is behind the SAME NAT IP as Client 1 (198.51.100.10),
+        # but has a distinct guest session cookie - it must NOT collapse into Client 1's exhausted IP bucket!
+        guest_3_id = str(uuid4())
+        res_3 = await client.post(
+            "/api/v1/ai/generate-scenes",
+            json={"script": "Test script", "language": "en"},
+            headers={"X-Forwarded-For": f"{proxy_client_1}, 10.0.0.1"},
+            cookies={GUEST_SESSION_COOKIE: guest_3_id}
+        )
+        assert res_3.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_15_production_cookie_security(client: AsyncClient):
     """15. Test that guest_session_id cookie is HttpOnly, SameSite=lax, Path=/, and Secure in HTTPS/production"""
     from app.core.config import settings
+    from unittest.mock import patch, AsyncMock
 
     orig_env = settings.ENVIRONMENT
     settings.ENVIRONMENT = "development"
-    try:
-        # Case 1: Plain HTTP development -> cookie is HttpOnly, SameSite=lax, Path=/, but NOT Secure (works locally)
-        client.cookies.clear()
-        res_dev = await client.post(
-            "/api/v1/ai/analyze-script",
-            json={"script": "Hello world", "language": "en"}
-        )
-        assert res_dev.status_code == 200
-        set_cookie_dev = res_dev.headers.get("set-cookie", "").lower()
-        assert "guest_session_id=" in set_cookie_dev
-        assert "httponly" in set_cookie_dev
-        assert "samesite=lax" in set_cookie_dev
-        assert "path=/" in set_cookie_dev
-        assert "secure" not in set_cookie_dev
+    with patch("app.services.ai.script_analyzer.ScriptAnalyzerService.analyze_script", new_callable=AsyncMock) as mock_analyze:
+        mock_analyze.return_value = [{"scene_number": 1, "narration": "mock"}]
+        try:
+            # Case 1: Plain HTTP development -> cookie is HttpOnly, SameSite=lax, Path=/, but NOT Secure (works locally)
+            client.cookies.clear()
+            res_dev = await client.post(
+                "/api/v1/ai/generate-scenes",
+                json={"script": "Hello world", "language": "en"}
+            )
+            assert res_dev.status_code == 200
+            set_cookie_dev = res_dev.headers.get("set-cookie", "").lower()
+            assert "guest_session_id=" in set_cookie_dev
+            assert "httponly" in set_cookie_dev
+            assert "samesite=lax" in set_cookie_dev
+            assert "path=/" in set_cookie_dev
+            assert "secure" not in set_cookie_dev
 
-        # Case 2: Request forwarded over HTTPS (X-Forwarded-Proto: https) -> Secure MUST be present
-        client.cookies.clear()
-        res_https = await client.post(
-            "/api/v1/ai/analyze-script",
-            json={"script": "Hello world", "language": "en"},
-            headers={"X-Forwarded-Proto": "https"}
-        )
-        assert res_https.status_code == 200
-        set_cookie_https = res_https.headers.get("set-cookie", "").lower()
-        assert "guest_session_id=" in set_cookie_https
-        assert "httponly" in set_cookie_https
-        assert "samesite=lax" in set_cookie_https
-        assert "path=/" in set_cookie_https
-        assert "secure" in set_cookie_https
+            # Case 2: Request forwarded over HTTPS (X-Forwarded-Proto: https) -> Secure MUST be present
+            client.cookies.clear()
+            res_https = await client.post(
+                "/api/v1/ai/generate-scenes",
+                json={"script": "Hello world", "language": "en"},
+                headers={"X-Forwarded-Proto": "https"}
+            )
+            assert res_https.status_code == 200
+            set_cookie_https = res_https.headers.get("set-cookie", "").lower()
+            assert "guest_session_id=" in set_cookie_https
+            assert "httponly" in set_cookie_https
+            assert "samesite=lax" in set_cookie_https
+            assert "path=/" in set_cookie_https
+            assert "secure" in set_cookie_https
 
-        # Case 3: Production environment (ENVIRONMENT=production) -> Secure MUST be present
-        client.cookies.clear()
-        settings.ENVIRONMENT = "production"
-        res_prod = await client.post(
-            "/api/v1/ai/analyze-script",
-            json={"script": "Hello world", "language": "en"}
-        )
-        assert res_prod.status_code == 200
-        set_cookie_prod = res_prod.headers.get("set-cookie", "").lower()
-        assert "guest_session_id=" in set_cookie_prod
-        assert "httponly" in set_cookie_prod
-        assert "samesite=lax" in set_cookie_prod
-        assert "path=/" in set_cookie_prod
-        assert "secure" in set_cookie_prod
-    finally:
-        settings.ENVIRONMENT = orig_env
-        client.cookies.clear()
+            # Case 3: Production environment (ENVIRONMENT=production) -> Secure MUST be present
+            client.cookies.clear()
+            settings.ENVIRONMENT = "production"
+            res_prod = await client.post(
+                "/api/v1/ai/generate-scenes",
+                json={"script": "Hello world", "language": "en"}
+            )
+            assert res_prod.status_code == 200
+            set_cookie_prod = res_prod.headers.get("set-cookie", "").lower()
+            assert "guest_session_id=" in set_cookie_prod
+            assert "httponly" in set_cookie_prod
+            assert "samesite=lax" in set_cookie_prod
+            assert "path=/" in set_cookie_prod
+            assert "secure" in set_cookie_prod
+        finally:
+            settings.ENVIRONMENT = orig_env
+            client.cookies.clear()
 
 
 

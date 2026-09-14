@@ -314,12 +314,16 @@ class RenderEngineService:
             x_expr = "iw/2-(iw/zoom/2)"
             y_expr = "ih/2-(ih/zoom/2)"
         elif camera_motion == "pan_left":
+            # Pan left-to-right: x runs 0 → (iw - iw/zoom) over total_frames.
+            # NOTE: FFmpeg's zoompan does NOT expose the 'd' variable in x/y expressions
+            # (only in 'z'), so we bake total_frames as a literal integer constant.
             zoom_expr = "1.15"
-            x_expr = "min((on/d)*(iw-iw/zoom),iw-iw/zoom)"
+            x_expr = f"on/{total_frames}*(iw-iw/zoom)"
             y_expr = "ih/2-(ih/zoom/2)"
         elif camera_motion == "pan_right":
+            # Pan right-to-left: x runs (iw - iw/zoom) → 0 over total_frames.
             zoom_expr = "1.15"
-            x_expr = "max((1-on/d)*(iw-iw/zoom),0)"
+            x_expr = f"(1-on/{total_frames})*(iw-iw/zoom)"
             y_expr = "ih/2-(ih/zoom/2)"
         else:
             # Smooth subtle pulse
@@ -332,6 +336,7 @@ class RenderEngineService:
             f"crop=1080:1920,"
             f"zoompan=z='{zoom_expr}':d={total_frames}:x='{x_expr}':y='{y_expr}':s=1080x1920:fps={fps}"
         )
+
 
         # Subtitle burning via drawtext if subtitle exists
         if sub_path and os.path.isfile(sub_path):

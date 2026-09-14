@@ -1,5 +1,5 @@
-﻿from fastapi import APIRouter
-from app.api.v1.endpoints import auth, projects, ai, scenes, render, settings, analytics, notifications, characters
+from fastapi import APIRouter
+from app.api.v1.endpoints import auth, projects, ai, scenes, render, settings, characters
 
 api_router = APIRouter(prefix="/v1")
 
@@ -10,8 +10,6 @@ api_router.include_router(ai.router)
 api_router.include_router(scenes.router)
 api_router.include_router(render.router)
 api_router.include_router(settings.router)
-api_router.include_router(analytics.router)
-api_router.include_router(notifications.router)
 api_router.include_router(characters.router)
 
 

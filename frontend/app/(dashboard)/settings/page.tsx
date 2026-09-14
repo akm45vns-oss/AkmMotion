@@ -1,15 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { Settings, Moon, Sun, Bell, Video, ShieldCheck, Check } from "lucide-react";
+import { Settings, Video, ShieldCheck, Check } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
 
 export default function SettingsPage() {
   const user = useUserStore((state) => state.user);
 
-  const [theme, setTheme] = useState("dark");
   const [quality, setQuality] = useState("1080p");
-  const [notifications, setNotifications] = useState(true);
   const [saved, setSaved] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
@@ -25,7 +23,7 @@ export default function SettingsPage() {
           <Settings className="w-6 h-6 text-indigo-400" />
           Account & Studio Settings
         </h1>
-        <p className="text-sm text-gray-400 mt-1">Manage your profile, video export defaults, and studio preferences</p>
+        <p className="text-sm text-gray-400 mt-1">Manage your profile and default video export settings</p>
       </div>
 
       {saved && (
@@ -73,8 +71,8 @@ export default function SettingsPage() {
             Video Export Defaults
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {["720p", "1080p", "4k"].map((q) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {["720p", "1080p"].map((q) => (
               <button
                 key={q}
                 type="button"
@@ -87,31 +85,10 @@ export default function SettingsPage() {
               >
                 <div className="text-sm font-semibold uppercase">{q} Resolution</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  {q === "1080p" ? "Recommended for Shorts/Reels" : q === "720p" ? "Faster rendering" : "Ultra HD high clarity"}
+                  {q === "1080p" ? "Recommended for Shorts & Reels (Full HD)" : "Faster rendering (Standard HD)"}
                 </div>
               </button>
             ))}
-          </div>
-        </div>
-
-        {/* Studio Theme & Notifications */}
-        <div className="p-6 rounded-2xl bg-[#0D1322] border border-gray-800 space-y-4">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Bell className="w-4 h-4 text-pink-400" />
-            Preferences
-          </h2>
-
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#090D16] border border-gray-800">
-            <div>
-              <div className="text-sm font-semibold text-white">Email Notifications</div>
-              <div className="text-xs text-gray-400">Receive emails when your video rendering completes</div>
-            </div>
-            <input
-              type="checkbox"
-              checked={notifications}
-              onChange={(e) => setNotifications(e.target.checked)}
-              className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
-            />
           </div>
         </div>
 

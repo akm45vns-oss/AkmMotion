@@ -1,9 +1,9 @@
-﻿from typing import Optional
+from typing import Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from app.models.models import User, UserSettings, Credit, CreditTransactionType, AuthProvider
+from app.models.models import User, UserSettings, AuthProvider
 
 
 class UserRepository:
@@ -34,16 +34,6 @@ class UserRepository:
         # Create default User Settings
         settings = UserSettings(user_id=user.id)
         self.db.add(settings)
-
-        # Grant 100 Signup Bonus Credits
-        credit = Credit(
-            user_id=user.id,
-            amount=100,
-            transaction_type=CreditTransactionType.bonus,
-            description="Welcome Sign-up Bonus Credits",
-            balance_after=100
-        )
-        self.db.add(credit)
 
         await self.db.commit()
         await self.db.refresh(user)
