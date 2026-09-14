@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Video, Volume2, Type } from "lucide-react";
+import { ArrowRight, Video, Volume2, Type, Sparkles } from "lucide-react";
 import StyleSelector from "@/components/project/StyleSelector";
 import VoiceSelector from "@/components/project/VoiceSelector";
 import { projectsApi } from "@/lib/api/projects";
@@ -53,7 +53,6 @@ export default function NewProjectPage() {
         console.warn("Pipeline generation notice:", pipeErr);
       }
 
-      // Redirect cleanly to studio editor
       if (typeof window !== "undefined") {
         window.location.href = `/projects/${project.id}/editor`;
       } else {
@@ -66,30 +65,28 @@ export default function NewProjectPage() {
     }
   };
 
-
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <div className="max-w-3xl mx-auto space-y-6 pb-12">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-indigo-400" />
-          Create New AI Video Project
+      <div className="border-b border-[#24272E] pb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#F2F2F3] tracking-tight">
+          Create New Video Project
         </h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Paste your script, select style and voiceover, and let AI generate your 9:16 vertical video scenes.
+        <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+          Paste your narrative script to generate 9:16 vertical scenes with character consistency and synchronized Indian voiceovers.
         </p>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium">
+        <div className="p-3.5 rounded-xl bg-[#E55353]/10 border border-[#E55353]/25 text-[#E55353] text-xs font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Project Name */}
-        <div className="p-6 rounded-2xl bg-[#0D1322] border border-gray-800 space-y-4">
-          <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Step 1: Project Title */}
+        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
+          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider">
             1. Project Title
           </label>
           <input
@@ -97,74 +94,73 @@ export default function NewProjectPage() {
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. 5 Mind-Blowing Facts About AI"
-            className="w-full px-4 py-3 rounded-xl bg-[#090D16] border border-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm"
+            placeholder="e.g. 5 Mind-Blowing Historical Mysteries"
+            className="input-base text-sm"
           />
         </div>
 
-        {/* Script Input */}
-        <div className="p-6 rounded-2xl bg-[#0D1322] border border-gray-800 space-y-4">
+        {/* Step 2: Script Input */}
+        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-              <Type className="w-4 h-4 text-indigo-400" />
-              2. Paste or Write Script
+            <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+              <Type className="w-3.5 h-3.5 text-[#E0693B]" />
+              <span>2. Script Text</span>
             </label>
-            <div className="text-xs text-gray-400">
-              <span className="font-semibold text-indigo-400">{wordCount}</span> words • ~
-              <span className="font-semibold text-indigo-400">{estimatedSeconds}s</span> video duration
+            <div className="text-[11px] text-neutral-400 font-mono">
+              <span className="font-semibold text-[#F2F2F3]">{wordCount}</span> words · ~
+              <span className="font-semibold text-[#F2F2F3]">{estimatedSeconds}s</span> duration
             </div>
           </div>
 
           <textarea
-            rows={8}
+            rows={7}
             required
             value={scriptContent}
             onChange={(e) => setScriptContent(e.target.value)}
-            placeholder="Paste your video script here in English or Hindi... AI will segment scenes, synthesize natural voiceover, and prepare for 1080x1920 MP4 rendering."
-            className="w-full px-4 py-3 rounded-xl bg-[#090D16] border border-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-sm leading-relaxed"
+            placeholder="Paste your video script in English or Hindi here. The AI Director will deconstruct it into 5-7 vertical scenes, craft English visual prompts, and synthesize synchronized speech..."
+            className="input-base text-xs sm:text-sm leading-relaxed resize-none"
           />
         </div>
 
-        {/* Visual Style Selection */}
-        <div className="p-6 rounded-2xl bg-[#0D1322] border border-gray-800 space-y-4">
-          <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-            <Video className="w-4 h-4 text-purple-400" />
-            3. Choose Visual Style
+        {/* Step 3: Style Selection */}
+        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
+          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Video className="w-3.5 h-3.5 text-[#E0693B]" />
+            <span>3. Visual Style</span>
           </label>
           <StyleSelector selected={style} onSelect={setStyle} />
         </div>
 
-        {/* Voiceover Selection */}
-        <div className="p-6 rounded-2xl bg-[#0D1322] border border-gray-800 space-y-4">
-          <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-pink-400" />
-            4. Choose AI Narration Voice
+        {/* Step 4: Voiceover Selection */}
+        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
+          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-[#E0693B]" />
+            <span>4. Narration Voice</span>
           </label>
           <VoiceSelector selected={voice} onSelect={setVoice} />
         </div>
 
-        {/* Generate CTA Button */}
-        <div className="flex justify-end pt-4">
+        {/* Action Button */}
+        <div className="flex justify-end pt-2">
           <button
             type="submit"
             disabled={loading}
-            className="px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-base shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary w-full sm:w-auto px-7 py-3 text-sm flex items-center justify-center gap-2 touch-target shadow-md"
           >
             {loading ? (
               <>
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>{loadingMessage}</span>
               </>
             ) : (
               <>
                 <span>Generate Video Studio</span>
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </div>
       </form>
-
     </div>
   );
 }

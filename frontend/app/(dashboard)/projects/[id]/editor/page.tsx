@@ -11,7 +11,7 @@ import VideoPreview from "@/components/editor/VideoPreview";
 import SceneEditor from "@/components/editor/SceneEditor";
 import Timeline from "@/components/editor/Timeline";
 import RenderModal from "@/components/editor/RenderModal";
-import { Loader2, Sparkles, Wand2 } from "lucide-react";
+import { Loader2, Sparkles, Sliders, Film, Layers } from "lucide-react";
 
 export default function EditorPage() {
   const params = useParams();
@@ -30,6 +30,7 @@ export default function EditorPage() {
 
   const [isRenderModalOpen, setIsRenderModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"preview" | "inspector" | "timeline">("preview");
 
   const fetchProjectAndScenes = useCallback(async () => {
     if (!projectId) return null;
@@ -74,7 +75,6 @@ export default function EditorPage() {
     setIsLoading(true);
     fetchProjectAndScenes()
       .then((res) => {
-        // Auto-generate if project has script but zero scenes
         if (res && res.scenesData.length === 0 && res.projectData?.script?.content) {
           handleGenerateScenes();
         }
@@ -88,17 +88,17 @@ export default function EditorPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#090D16]">
+      <div className="h-screen w-full flex items-center justify-center bg-[#0C0D0E]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-          <p className="text-sm font-medium text-gray-400">Loading Video Studio...</p>
+          <Loader2 className="w-7 h-7 text-[#E0693B] animate-spin" />
+          <p className="text-xs font-medium text-neutral-400">Loading Video Studio...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-[#090D16] text-white overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-[#0C0D0E] text-[#F2F2F3] overflow-hidden">
       {/* Top Studio Toolbar */}
       <ToolBar
         onRenderClick={() => setIsRenderModalOpen(true)}
@@ -106,51 +106,101 @@ export default function EditorPage() {
         isGenerating={isGenerating}
       />
 
-      {/* Main Studio Viewport (Preview Player + Inspector) */}
+      {/* Mobile Workspace Mode Switcher (Visible only on < lg screens) */}
+      <div className="lg:hidden border-b border-[#24272E] bg-[#141517] px-3 py-1.5 flex items-center justify-around text-xs select-none">
+        <button
+          onClick={() => setMobileTab("preview")}
+          className={`flex items-center gap-1.5 py-1 px-3 rounded-lg font-medium transition-colors ${
+            mobileTab === "preview"
+              ? "bg-[#1B1D21] text-[#E0693B] font-semibold border border-[#333742]"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <Film className="w-3.5 h-3.5" />
+          <span>Player</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab("inspector")}
+          className={`flex items-center gap-1.5 py-1 px-3 rounded-lg font-medium transition-colors ${
+            mobileTab === "inspector"
+              ? "bg-[#1B1D21] text-[#E0693B] font-semibold border border-[#333742]"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Inspector</span>
+        </button>
+
+        <button
+          onClick={() => setMobileTab("timeline")}
+          className={`flex items-center gap-1.5 py-1 px-3 rounded-lg font-medium transition-colors ${
+            mobileTab === "timeline"
+              ? "bg-[#1B1D21] text-[#E0693B] font-semibold border border-[#333742]"
+              : "text-neutral-400 hover:text-white"
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Timeline</span>
+        </button>
+      </div>
+
+      {/* ── Main Studio Viewport ────────────────────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 border-r border-gray-800 p-4 flex flex-col justify-center items-center">
+        {/* Center Video Preview Viewport */}
+        <div
+          className={`flex-1 border-r border-[#24272E] p-2 sm:p-4 flex flex-col justify-center items-center overflow-y-auto ${
+            mobileTab !== "preview" ? "hidden lg:flex" : "flex"
+          }`}
+        >
           {isGenerating ? (
-            <div className="w-full max-w-md p-8 rounded-2xl bg-[#0D1322] border border-indigo-500/20 text-center space-y-4 shadow-2xl">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-                <Sparkles className="w-7 h-7 text-indigo-400 animate-spin" />
+            <div className="w-full max-w-sm p-6 rounded-xl bg-[#141517] border border-[#24272E] text-center space-y-3 shadow-xl">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-[#E0693B]/10 border border-[#E0693B]/25 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-[#E0693B] animate-spin" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-white">AI Director at Work</h3>
-                <p className="text-xs text-gray-400">
-                  Splitting script into 5-7 vertical scenes, generating cinematic visual prompts & audio tracks...
+                <h3 className="text-sm font-bold text-[#F2F2F3]">AI Director at Work</h3>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Splitting script into vertical scenes, synthesizing Indian voiceover, and preparing visual assets...
                 </p>
               </div>
             </div>
           ) : scenes.length === 0 ? (
-            <div className="w-full max-w-md p-8 rounded-2xl bg-[#0D1322] border border-gray-800 text-center space-y-5 shadow-2xl">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <Sparkles className="w-7 h-7" />
+            <div className="w-full max-w-sm p-6 rounded-xl bg-[#141517] border border-[#24272E] text-center space-y-4 shadow-xl">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-center text-neutral-400">
+                <Film className="w-6 h-6" />
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-lg font-bold text-white">No Scenes Generated Yet</h3>
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  Your script is saved. Click below to automatically generate all 9:16 vertical scenes, captions, and visual assets.
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-[#F2F2F3]">No Scenes Generated Yet</h3>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Your script is saved. Click below to generate 9:16 vertical scenes and audio narration.
                 </p>
               </div>
               <button
                 onClick={handleGenerateScenes}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-90 text-white text-xs font-bold shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all"
+                className="btn-primary w-full py-2.5 text-xs shadow-sm flex items-center justify-center gap-2"
               >
-                <Sparkles className="w-4 h-4" />
-                Generate AI Scenes
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Generate AI Scenes</span>
               </button>
             </div>
           ) : (
             <VideoPreview activeScene={activeScene} />
           )}
         </div>
-        <div className="w-96 p-4">
+
+        {/* Right Scene Inspector Panel */}
+        <div
+          className={`w-full lg:w-96 flex-shrink-0 overflow-y-auto ${
+            mobileTab !== "inspector" ? "hidden lg:block" : "block"
+          }`}
+        >
           <SceneEditor />
         </div>
       </div>
 
-      {/* Bottom Timeline Bar */}
-      <div className="h-44 border-t border-gray-800 bg-[#0D1322]">
+      {/* ── Bottom Timeline Bar ─────────────────────────────────────────────── */}
+      <div className={`h-40 flex-shrink-0 ${mobileTab !== "timeline" ? "hidden lg:block" : "block"}`}>
         <Timeline />
       </div>
 

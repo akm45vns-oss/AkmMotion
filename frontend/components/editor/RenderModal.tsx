@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useEditorStore } from "@/lib/stores/editorStore";
-import { Download, CheckCircle2, AlertCircle, X, Film, Sparkles, Loader2 } from "lucide-react";
+import { Download, CheckCircle2, AlertCircle, X, Film, Loader2 } from "lucide-react";
 import { renderApi, RenderJob } from "@/lib/api/render";
 
 interface RenderModalProps {
@@ -43,7 +43,7 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
         attempts += 1;
         if (attempts > MAX_ATTEMPTS) {
           cleanupPolling();
-          setErrorMsg("Rendering is taking longer than usual. Please check your project dashboard.");
+          setErrorMsg("Rendering is taking longer than expected. Please check your project dashboard.");
           setPhase("error");
           return;
         }
@@ -55,7 +55,7 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
           if (job.status === "processing" || job.status === "pending") {
             setProgress(job.progress || 10);
             if (job.progress < 20) {
-              setStatusText("Preparing visual scenes & audio tracks...");
+              setStatusText("Preparing visual scenes & audio narration...");
             } else if (job.progress < 70) {
               setStatusText(`Rendering 9:16 vertical MP4 video (${job.progress}%)...`);
             } else {
@@ -75,7 +75,6 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
           }
         } catch (err: any) {
           console.error("Failed to poll render status:", err);
-          // Only fail after 5 consecutive errors to tolerate transient network hiccups
           if (attempts > 5 && !currentJob) {
             cleanupPolling();
             setPhase("error");
@@ -131,12 +130,11 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
     };
   }, [startRender, cleanupPolling]);
 
-  // First scene preview image if available
   const firstSceneImg = scenes?.[0]?.assets?.find((a: any) => a.asset_type === "image")?.url;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="w-full max-w-md p-6 rounded-3xl bg-[#0D1322] border border-gray-800 shadow-2xl relative flex flex-col items-center">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto p-5 sm:p-6 rounded-2xl bg-[#141517] border border-[#24272E] shadow-2xl relative flex flex-col items-center">
         {/* Close Button */}
         <button
           onClick={() => {
@@ -144,24 +142,24 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
             cleanupPolling();
             onClose();
           }}
-          className="absolute top-4 right-4 z-10 p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          className="absolute top-3.5 right-3.5 z-10 p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-[#1B1D21] transition-colors"
+          aria-label="Close modal"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Modal Header */}
-        <div className="text-center mb-4">
-          <h2 className="text-lg font-bold text-white flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400" />
-            <span>Server Video Rendering Studio</span>
+        <div className="text-center mb-3">
+          <h2 className="text-base font-bold text-[#F2F2F3] flex items-center justify-center gap-1.5">
+            <span>Video Export Studio</span>
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Real 1080x1920 MP4 H.264 encode with narration & subtitles
+          <p className="text-[11px] text-neutral-400 mt-0.5">
+            1080×1920 MP4 H.264 vertical video with burned-in subtitles
           </p>
         </div>
 
-        {/* Compact Smartphone Vertical Preview Frame */}
-        <div className="relative w-[214px] h-[380px] rounded-2xl overflow-hidden border-2 border-gray-800 bg-black shadow-2xl flex items-center justify-center my-2">
+        {/* Smartphone Vertical Preview Frame */}
+        <div className="relative w-[200px] h-[355px] rounded-xl overflow-hidden border border-[#24272E] bg-black shadow-xl flex items-center justify-center my-2">
           {phase === "done" && downloadUrl ? (
             <video
               src={downloadUrl}
@@ -169,90 +167,84 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
               autoPlay
               loop
               playsInline
-              className="w-full h-full object-cover rounded-2xl"
+              className="w-full h-full object-cover rounded-xl"
             />
           ) : phase === "rendering" ? (
-            <div className="relative w-full h-full flex flex-col items-center justify-center bg-gray-950 p-4 text-center">
+            <div className="relative w-full h-full flex flex-col items-center justify-center bg-neutral-950 p-4 text-center">
               {firstSceneImg ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={firstSceneImg}
                   alt="Scene preview"
-                  className="absolute inset-0 w-full h-full object-cover opacity-25 filter blur-[1px]"
+                  className="absolute inset-0 w-full h-full object-cover opacity-20 filter blur-[1px]"
                 />
               ) : null}
-              <div className="relative z-10 flex flex-col items-center gap-3">
-                <div className="p-3.5 rounded-full bg-indigo-500/20 border border-indigo-500/30">
-                  <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+              <div className="relative z-10 flex flex-col items-center gap-2.5">
+                <div className="p-3 rounded-xl bg-[#E0693B]/10 border border-[#E0693B]/25">
+                  <Loader2 className="w-6 h-6 text-[#E0693B] animate-spin" />
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-white">Encoding MP4</span>
-                  <p className="text-[10px] text-gray-400">
-                    {scenes.length} Scene{scenes.length === 1 ? "" : "s"}
+                <div className="space-y-0.5">
+                  <span className="text-xs font-semibold text-[#F2F2F3]">Encoding MP4</span>
+                  <p className="text-[10px] text-neutral-400 font-mono">
+                    {scenes.length} Scenes · 30 FPS
                   </p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-2 p-4 text-center">
-              <AlertCircle className="w-10 h-10 text-red-400" />
-              <p className="text-white font-bold text-sm">Render Failed</p>
-              <p className="text-red-300 text-[11px] line-clamp-3">{errorMsg}</p>
+            <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-2 p-4 text-center">
+              <AlertCircle className="w-8 h-8 text-[#E55353]" />
+              <p className="text-white font-bold text-xs">Render Failed</p>
+              <p className="text-[#E55353] text-[10px] line-clamp-3">{errorMsg}</p>
             </div>
           )}
         </div>
 
-        {/* Bottom Progress & Download Controls */}
-        <div className="w-full mt-4 space-y-3">
+        {/* Phase Status & Progress */}
+        <div className="w-full space-y-3 mt-3 text-center">
           {phase === "rendering" && (
-            <>
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="text-indigo-400 flex items-center gap-1.5 truncate max-w-[260px]">
-                  <Film className="w-3.5 h-3.5 animate-pulse text-emerald-400 flex-shrink-0" />
-                  <span className="truncate">{statusText}</span>
-                </span>
-                <span className="text-white font-bold">{progress}%</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-neutral-400">{statusText}</span>
+                <span className="text-[#E0693B] font-mono font-semibold">{progress}%</span>
               </div>
-              <div className="w-full h-2 bg-gray-900 rounded-full overflow-hidden border border-gray-800">
+              <div className="w-full h-1.5 rounded-full bg-[#1B1D21] overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-500"
-                  style={{ width: `${progress}%` }}
+                  className="h-full bg-[#E0693B] transition-all duration-300"
+                  style={{ width: `${Math.max(progress, 5)}%` }}
                 />
               </div>
-              <p className="text-[11px] text-gray-400 text-center">
-                Processing {scenes.length} Scenes on Server Engine
-              </p>
-            </>
+            </div>
           )}
 
-          {phase === "done" && downloadUrl && (
+          {phase === "done" && (
             <div className="space-y-2">
-              <a
-                href={downloadUrl}
-                download={`akmmotion_${projectId.slice(0, 8)}.mp4`}
-                className="block w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm text-center shadow-xl transition-all"
-              >
-                <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-1.5 text-[#2EB88A] text-xs font-semibold">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Ready for Download</span>
+              </div>
+              {downloadUrl && (
+                <a
+                  href={downloadUrl}
+                  download={`akmmotion_${projectId}.mp4`}
+                  className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-2 shadow-sm touch-target"
+                >
                   <Download className="w-4 h-4" />
-                  <span>Download MP4 Video</span>
-                </div>
-              </a>
-              <button
-                onClick={startRender}
-                className="w-full py-2 rounded-xl bg-gray-800 text-xs text-gray-300 hover:text-white transition-colors"
-              >
-                Re-render Video
-              </button>
+                  <span>Download 1080×1920 MP4</span>
+                </a>
+              )}
             </div>
           )}
 
           {phase === "error" && (
-            <button
-              onClick={startRender}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-colors"
-            >
-              Try Again
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={startRender}
+                className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span>Retry Render</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

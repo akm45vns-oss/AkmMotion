@@ -5,24 +5,20 @@ import { useEditorStore } from "@/lib/stores/editorStore";
 import { scenesApi } from "@/lib/api/scenes";
 import {
   Type, ImageIcon, Sliders, Mic2, RefreshCw, Sparkles,
-  Film, Subtitles, Crop, Wand2, ChevronDown
+  Film, Subtitles, Crop, Wand2
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api/client";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type SubtitleStyle = "yellow-cyan" | "karaoke" | "minimal";
-type AspectRatio   = "9:16" | "1:1" | "16:9";
-type VoiceLang     = "en" | "hi";
-type VoiceGender   = "male" | "female";
 type StylePreset   = "Explainer" | "Cinematic" | "Vlog" | "Anime" | "Story" | "Finance";
 
 const STYLE_PRESETS: { id: StylePreset; label: string; emoji: string }[] = [
-  { id: "Explainer", label: "Explainer",    emoji: "📘" },
-  { id: "Cinematic",  label: "Cinematic",    emoji: "🎬" },
-  { id: "Vlog",       label: "Vlog",         emoji: "📱" },
-  { id: "Anime",      label: "Anime",        emoji: "✨" },
-  { id: "Story",      label: "Story",        emoji: "📖" },
-  { id: "Finance",    label: "Finance",      emoji: "💹" },
+  { id: "Explainer", label: "Explainer", emoji: "📘" },
+  { id: "Cinematic", label: "Cinematic", emoji: "🎬" },
+  { id: "Vlog",      label: "Vlog",      emoji: "📱" },
+  { id: "Anime",     label: "Anime",     emoji: "✨" },
+  { id: "Story",     label: "Story",     emoji: "📖" },
+  { id: "Finance",   label: "Finance",   emoji: "💹" },
 ];
 
 const ANIMATION_STYLES = [
@@ -36,8 +32,6 @@ export default function SceneEditor() {
     updateSceneInStore,
     subtitleStyle,
     setSubtitleStyle,
-    aspectRatio,
-    setAspectRatio,
     voiceLang,
     setVoiceLang,
     voiceGender,
@@ -49,7 +43,6 @@ export default function SceneEditor() {
   const activeScene = scenes[activeSceneIndex];
   const fullProjectScript = scenes.map((s) => s.narration).join(" ");
 
-  // ── Local scene field state ───────────────────────────────────────────────
   const [narration,      setNarration]      = useState("");
   const [subtitle,       setSubtitle]       = useState("");
   const [imagePrompt,    setImagePrompt]    = useState("");
@@ -73,11 +66,9 @@ export default function SceneEditor() {
 
   if (!activeScene) {
     return (
-      <div className="w-80 border-l border-gray-800 bg-[#0D1322] p-6 flex items-center justify-center text-center text-xs text-gray-500">
-        <div>
-          <Sliders className="w-5 h-5 text-gray-700 mx-auto mb-2" />
-          Select a scene to edit
-        </div>
+      <div className="w-full h-full p-6 flex flex-col items-center justify-center text-center text-xs text-neutral-400">
+        <Sliders className="w-6 h-6 text-neutral-500 mb-2" />
+        <p>Select a scene from the timeline below to edit its properties</p>
       </div>
     );
   }
@@ -95,7 +86,7 @@ export default function SceneEditor() {
       });
       updateSceneInStore(activeScene.id, updated);
     } catch (err) {
-      console.error(err);
+      console.error("Save scene error:", err);
     } finally {
       setSaving(false);
     }
@@ -108,7 +99,10 @@ export default function SceneEditor() {
     try {
       const res = await fetch(`${API_BASE_URL}/ai/regenerate-scene-image`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
+        },
         body: JSON.stringify({
           scene_id: activeScene.id,
           prompt:   imagePrompt || undefined,
@@ -117,7 +111,6 @@ export default function SceneEditor() {
       });
       if (res.ok) {
         const data = await res.json();
-        // Update the scene's image asset URL in the store
         const updatedAssets = (activeScene.assets || []).map((a: any) =>
           a.asset_type === "image" ? { ...a, url: data.image_url } : a
         );
@@ -127,50 +120,48 @@ export default function SceneEditor() {
       }
     } catch (err) {
       console.error("Regen error:", err);
-      } finally {
-        setRegenLoading(false);
-      }
-    };
+    } finally {
+      setRegenLoading(false);
+    }
+  };
 
-    // ── AI Prompt enhancer ────────────────────────────────────────────────────
-    const handleEnhancePrompt = async () => {
-      if (!activeScene) return;
-      setEnhanceLoading(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/ai/generate-scene-prompt`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
-          },
-          body: JSON.stringify({
-            narration: narration || activeScene.narration,
-            style: stylePreset,
-            story_context: fullProjectScript,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.prompt) {
-            setImagePrompt(data.prompt);
-          }
+  // ── AI Prompt enhancer ────────────────────────────────────────────────────
+  const handleEnhancePrompt = async () => {
+    if (!activeScene) return;
+    setEnhanceLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/ai/generate-scene-prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
+        },
+        body: JSON.stringify({
+          narration: narration || activeScene.narration,
+          style: stylePreset,
+          story_context: fullProjectScript,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.prompt) {
+          setImagePrompt(data.prompt);
         }
-      } catch (err) {
-        console.error("Enhance prompt error:", err);
-      } finally {
-        setEnhanceLoading(false);
       }
-    };
-
+    } catch (err) {
+      console.error("Enhance prompt error:", err);
+    } finally {
+      setEnhanceLoading(false);
+    }
+  };
 
   return (
-    <div className="w-96 border-l border-gray-800/60 bg-[#0D1322] flex flex-col justify-between overflow-y-auto">
-      <div className="p-4 space-y-5">
-
-        {/* ── Section header ─────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-gray-800/60 pb-3">
-          <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+    <div className="w-full h-full flex flex-col justify-between overflow-y-auto bg-[#141517] border-l border-[#24272E]">
+      <div className="p-4 sm:p-5 space-y-5">
+        {/* ── Section Header ─────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between border-b border-[#24272E] pb-3">
+          <h2 className="text-xs font-bold text-[#F2F2F3] uppercase tracking-wider flex items-center gap-2">
+            <Sliders className="w-3.5 h-3.5 text-[#E0693B]" />
             Scene #{activeScene.scene_number} Inspector
           </h2>
           <div className="flex items-center gap-1.5">
@@ -179,32 +170,32 @@ export default function SceneEditor() {
                 {activeScene.camera_motion.replace(/_/g, " ").toUpperCase()}
               </span>
             )}
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+            <span className="text-[10px] px-2 py-0.5 rounded bg-[#1B1D21] border border-[#24272E] text-neutral-300 font-mono">
               {duration}s
             </span>
           </div>
         </div>
 
-
         {/* ─────────────── STYLE PRESET ──────────────────────────────────── */}
         <div className="space-y-2">
-          <label className="section-label flex items-center gap-1.5">
-            <Film className="w-3 h-3 text-indigo-400" />
-            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Style Preset</span>
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
+            <Film className="w-3 h-3 text-[#E0693B]" />
+            <span>Style Preset</span>
           </label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {STYLE_PRESETS.map(({ id, label, emoji }) => (
               <button
                 key={id}
+                type="button"
                 onClick={() => setStylePreset(id)}
-                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-all flex items-center gap-1 ${
+                className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-colors flex items-center justify-center gap-1 min-h-[36px] ${
                   stylePreset === id
-                    ? "bg-indigo-600/20 border-indigo-500/60 text-indigo-300"
-                    : "bg-transparent border-gray-800 text-gray-500 hover:border-gray-700 hover:text-gray-300"
+                    ? "bg-[#E0693B]/10 border-[#E0693B] text-[#E0693B] font-semibold"
+                    : "bg-[#1B1D21] border-[#24272E] text-neutral-400 hover:text-white"
                 }`}
               >
                 <span>{emoji}</span>
-                <span>{label}</span>
+                <span className="truncate">{label}</span>
               </button>
             ))}
           </div>
@@ -212,20 +203,25 @@ export default function SceneEditor() {
 
         {/* ─────────────── VOICE PICKER ─────────────────────────────────── */}
         <div className="space-y-2">
-          <label className="flex items-center gap-1.5">
-            <Mic2 className="w-3 h-3 text-purple-400" />
-            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Voice</span>
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
+            <Mic2 className="w-3 h-3 text-[#E0693B]" />
+            <span>Voice Options</span>
           </label>
-          <div className="voice-picker space-y-2">
+          <div className="p-3 rounded-xl bg-[#1B1D21] border border-[#24272E] space-y-2 text-xs">
             {/* Language */}
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-400">Language</span>
+              <span className="text-neutral-400">Language</span>
               <div className="flex gap-1">
                 {(["en", "hi"] as const).map((l) => (
                   <button
                     key={l}
+                    type="button"
                     onClick={() => setVoiceLang(l)}
-                    className={`voice-option-pill ${voiceLang === l ? "active" : ""}`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] border font-medium transition-colors ${
+                      voiceLang === l
+                        ? "bg-[#E0693B] border-[#E0693B] text-white"
+                        : "bg-[#141517] border-[#24272E] text-neutral-400 hover:text-white"
+                    }`}
                   >
                     {l === "en" ? "🇬🇧 English" : "🇮🇳 Hindi"}
                   </button>
@@ -234,13 +230,18 @@ export default function SceneEditor() {
             </div>
             {/* Gender */}
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-gray-400">Voice</span>
+              <span className="text-neutral-400">Gender</span>
               <div className="flex gap-1">
                 {(["male", "female"] as const).map((g) => (
                   <button
                     key={g}
+                    type="button"
                     onClick={() => setVoiceGender(g)}
-                    className={`voice-option-pill ${voiceGender === g ? "active" : ""}`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] border font-medium transition-colors ${
+                      voiceGender === g
+                        ? "bg-[#E0693B] border-[#E0693B] text-white"
+                        : "bg-[#141517] border-[#24272E] text-neutral-400 hover:text-white"
+                    }`}
                   >
                     {g === "male" ? "👨 Male" : "👩 Female"}
                   </button>
@@ -252,15 +253,15 @@ export default function SceneEditor() {
 
         {/* ─────────────── ASPECT RATIO ─────────────────────────────────── */}
         <div className="space-y-2">
-          <label className="flex items-center gap-1.5">
-            <Crop className="w-3 h-3 text-cyan-400" />
-            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Aspect Ratio</span>
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
+            <Crop className="w-3 h-3 text-[#E0693B]" />
+            <span>Format</span>
           </label>
-          <div className="px-3 py-2 rounded-xl bg-[#090D16] border border-gray-800/80 flex items-center justify-between text-xs">
-            <span className="font-semibold text-white flex items-center gap-2">
+          <div className="px-3 py-2 rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-between text-xs">
+            <span className="font-semibold text-[#F2F2F3] flex items-center gap-2">
               <span>📱</span> 9:16 Vertical (Shorts / Reels)
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+            <span className="text-[10px] px-2 py-0.5 rounded bg-[#141517] border border-[#24272E] text-neutral-400 font-mono">
               1080×1920
             </span>
           </div>
@@ -268,20 +269,25 @@ export default function SceneEditor() {
 
         {/* ─────────────── SUBTITLE STYLE ───────────────────────────────── */}
         <div className="space-y-2">
-          <label className="flex items-center gap-1.5">
-            <Subtitles className="w-3 h-3 text-cyan-400" />
-            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Subtitle Style</span>
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
+            <Subtitles className="w-3 h-3 text-[#E0693B]" />
+            <span>Subtitle Layout</span>
           </label>
-          <div className="flex gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {([
-              { id: "yellow-cyan" as const, label: "Yellow-Cyan" },
+              { id: "yellow-cyan" as const, label: "Word Sync" },
               { id: "karaoke"    as const, label: "Karaoke" },
               { id: "minimal"    as const, label: "Minimal" },
             ]).map(({ id, label }) => (
               <button
                 key={id}
+                type="button"
                 onClick={() => setSubtitleStyle(id)}
-                className={`subtitle-style-btn flex-1 ${subtitleStyle === id ? "active" : ""}`}
+                className={`py-1.5 px-2 rounded-lg text-[11px] font-medium border text-center transition-colors min-h-[36px] ${
+                  subtitleStyle === id
+                    ? "bg-[#E0693B]/10 border-[#E0693B] text-[#E0693B] font-semibold"
+                    : "bg-[#1B1D21] border-[#24272E] text-neutral-400 hover:text-white"
+                }`}
               >
                 {label}
               </button>
@@ -290,63 +296,62 @@ export default function SceneEditor() {
         </div>
 
         {/* ─────────────── NARRATION TEXT ───────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-1.5">
-            <Type className="w-3 h-3 text-indigo-400" />
-            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Narration Script</span>
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
+            <Type className="w-3 h-3 text-[#E0693B]" />
+            <span>Narration Text</span>
           </label>
           <textarea
             rows={3}
             value={narration}
             onChange={(e) => setNarration(e.target.value)}
-            className="w-full p-3 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 leading-relaxed resize-none"
+            className="input-base text-xs leading-relaxed resize-none"
           />
         </div>
 
         {/* ─────────────── SUBTITLE CAPTION ─────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block">
-            Subtitle Caption
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-semibold text-neutral-300 uppercase tracking-wider block">
+            Burned-In Subtitle
           </label>
           <input
             type="text"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+            className="input-base text-xs"
           />
         </div>
 
         {/* ─────────────── IMAGE PROMPT + REGEN ────────────────────────── */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="flex items-center gap-1.5">
-              <ImageIcon className="w-3 h-3 text-purple-400" />
-              <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Visual Prompt</span>
+            <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
+              <ImageIcon className="w-3 h-3 text-[#E0693B]" />
+              <span>Visual Prompt</span>
             </label>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleEnhancePrompt}
                 disabled={enhanceLoading || regenLoading}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10 bg-transparent transition-all disabled:opacity-40"
-                title="Use AI to craft a vivid, story-aligned English visual prompt for this scene"
+                className="btn-ghost text-[10px] py-1 px-2 border border-[#24272E] disabled:opacity-40"
+                title="Optimize prompt with AI Director"
               >
-                <Sparkles className={`w-2.5 h-2.5 ${enhanceLoading ? "animate-spin" : ""}`} />
-                {enhanceLoading ? "Writing..." : "AI Prompt"}
+                <Sparkles className={`w-2.5 h-2.5 text-[#E0693B] ${enhanceLoading ? "animate-spin" : ""}`} />
+                <span>{enhanceLoading ? "Writing..." : "AI Prompt"}</span>
               </button>
               <button
                 type="button"
                 onClick={handleRegenerateImage}
                 disabled={regenLoading || enhanceLoading}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                className={`text-[10px] py-1 px-2.5 rounded-md font-medium border transition-colors flex items-center gap-1 ${
                   regenSuccess
-                    ? "border-emerald-500/60 text-emerald-400 bg-emerald-500/10"
-                    : "border-purple-500/40 text-purple-400 hover:bg-purple-500/10 bg-transparent"
+                    ? "border-[#2EB88A] text-[#2EB88A] bg-[#2EB88A]/10"
+                    : "border-[#E0693B]/40 text-[#E0693B] hover:bg-[#E0693B]/10"
                 } disabled:opacity-40 disabled:cursor-not-allowed`}
-                title="Regenerate scene image with Flux"
               >
                 <RefreshCw className={`w-2.5 h-2.5 ${regenLoading ? "animate-spin" : ""}`} />
-                {regenSuccess ? "Done!" : regenLoading ? "Generating..." : "Regen Image"}
+                <span>{regenSuccess ? "Done!" : regenLoading ? "Generating..." : "Regen Visual"}</span>
               </button>
             </div>
           </div>
@@ -354,18 +359,18 @@ export default function SceneEditor() {
             rows={3}
             value={imagePrompt}
             onChange={(e) => setImagePrompt(e.target.value)}
-            className="w-full p-3 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 leading-relaxed resize-none"
+            className="input-base text-xs leading-relaxed resize-none"
           />
         </div>
 
         {/* ─────────────── ANIMATION + DURATION ────────────────────────── */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Animation</label>
+            <label className="block text-[11px] font-semibold text-neutral-400 uppercase mb-1">Animation</label>
             <select
               value={animationStyle}
               onChange={(e) => setAnimationStyle(e.target.value)}
-              className="w-full px-2.5 py-2 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+              className="input-base text-xs py-1.5"
             >
               {ANIMATION_STYLES.map((s) => (
                 <option key={s} value={s}>
@@ -375,7 +380,7 @@ export default function SceneEditor() {
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Duration (s)</label>
+            <label className="block text-[11px] font-semibold text-neutral-400 uppercase mb-1">Duration (s)</label>
             <input
               type="number"
               step="0.5"
@@ -383,27 +388,26 @@ export default function SceneEditor() {
               max="15"
               value={duration}
               onChange={(e) => setDuration(parseFloat(e.target.value))}
-              className="w-full px-2.5 py-2 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+              className="input-base text-xs py-1.5"
             />
           </div>
         </div>
       </div>
 
       {/* ── Save button ──────────────────────────────────────────────────────── */}
-      <div className="p-4 border-t border-gray-800/60 space-y-2">
+      <div className="p-4 border-t border-[#24272E] bg-[#141517]">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-2 shadow-sm"
         >
           {saving ? (
-            <><RefreshCw className="w-3 h-3 animate-spin" /> Saving...</>
+            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving Changes...</>
           ) : (
-            <><Wand2 className="w-3 h-3" /> Apply Changes</>
+            <><Wand2 className="w-3.5 h-3.5" /> Apply Scene Changes</>
           )}
         </button>
       </div>
-
     </div>
   );
 }

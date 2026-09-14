@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, Plus, Search, UserCheck, Lock, ShieldCheck, RefreshCw, Wand2 } from "lucide-react";
+import { Plus, Search, UserCheck, Lock, ShieldCheck, RefreshCw } from "lucide-react";
 import CharacterCard from "@/components/character/CharacterCard";
 import CharacterDNAInspector from "@/components/character/CharacterDNAInspector";
 import CreateCharacterModal from "@/components/character/CreateCharacterModal";
@@ -51,105 +51,111 @@ export default function CharacterStudioPage() {
   const lockedCount = characters.filter((c) => c.is_locked).length;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12 p-6">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* Top Studio Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-gray-800 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#24272E] pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-indigo-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-[#F2F2F3] tracking-tight">
             Character Memory Studio (CME)
           </h1>
-          <p className="text-xs text-gray-400 mt-1">
-            Persistent AI character memory & identity locking for 100% visual consistency across all scenes.
+          <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+            Lock persistent visual identity across all scenes to ensure consistent faces, hairstyles, and outfits.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={fetchCharacters}
-            className="p-3 rounded-xl bg-[#0D1322] border border-gray-800 text-gray-400 hover:text-white transition-colors"
-            title="Refresh Character Memory"
+            className="p-2.5 rounded-xl bg-[#141517] border border-[#24272E] text-neutral-400 hover:text-white transition-colors"
+            title="Refresh Characters"
+            aria-label="Refresh Characters"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
 
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-xl shadow-indigo-600/20 flex items-center gap-2 transition-all"
+            className="btn-primary text-xs flex items-center gap-1.5 shadow-sm touch-target"
           >
             <Plus className="w-4 h-4" />
-            <span>Create New Character Profile</span>
+            <span>Create Character</span>
           </button>
         </div>
       </div>
 
-      {/* CME Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-5 rounded-3xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400">
-            <UserCheck className="w-6 h-6" />
+      {/* CME Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div className="p-4 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#1B1D21] border border-[#24272E] text-neutral-300 flex items-center justify-center">
+            <UserCheck className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Total Stored Characters</div>
-            <div className="text-2xl font-extrabold text-white">{characters.length}</div>
+            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Total Characters</div>
+            <div className="text-lg font-bold text-[#F2F2F3]">{characters.length}</div>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-            <Lock className="w-6 h-6" />
+        <div className="p-4 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#E0693B]/10 border border-[#E0693B]/25 text-[#E0693B] flex items-center justify-center">
+            <Lock className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Locked Character DNA</div>
-            <div className="text-2xl font-extrabold text-amber-400">{lockedCount} Locked</div>
+            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Locked DNA</div>
+            <div className="text-lg font-bold text-[#E0693B]">{lockedCount} Locked</div>
           </div>
         </div>
 
-        <div className="p-5 rounded-3xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <ShieldCheck className="w-6 h-6" />
+        <div className="p-4 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#2EB88A]/10 border border-[#2EB88A]/25 text-[#2EB88A] flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Average Consistency</div>
-            <div className="text-2xl font-extrabold text-emerald-400">95% Match Rate</div>
+            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Consistency Score</div>
+            <div className="text-lg font-bold text-[#2EB88A]">95% Match</div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Input */}
       <div className="relative">
-        <Search className="w-4 h-4 text-gray-500 absolute left-4 top-3.5" />
+        <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search characters by name, role, visual style, or outfit..."
-          className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#0D1322] border border-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 text-xs"
+          className="input-base text-xs pl-10 py-2.5"
         />
       </div>
 
       {/* Character Grid */}
       {loading ? (
-        <div className="h-64 flex flex-col items-center justify-center gap-3">
-          <Sparkles className="w-8 h-8 text-indigo-400 animate-spin" />
-          <p className="text-xs text-gray-400">Loading Character Memory Studio...</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-44 rounded-xl bg-[#141517] border border-[#24272E] animate-pulse" />
+          ))}
         </div>
       ) : characters.length === 0 ? (
-        <div className="p-12 rounded-3xl bg-[#0D1322] border border-gray-800 text-center space-y-3">
-          <Wand2 className="w-10 h-10 text-gray-600 mx-auto" />
-          <h3 className="text-base font-bold text-white">No Characters Found</h3>
-          <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            Characters are automatically detected from your scripts or created manually in Character Studio.
+        <div className="p-10 rounded-xl border border-dashed border-[#24272E] bg-[#141517]/40 text-center space-y-3">
+          <div className="w-12 h-12 rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-center mx-auto text-neutral-400">
+            <UserCheck className="w-5 h-5" />
+          </div>
+          <h3 className="text-sm font-semibold text-[#F2F2F3]">No characters found</h3>
+          <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+            Characters are automatically detected from script prompts or created manually for persistent identity locking.
           </p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
-          >
-            Create Your First Character
-          </button>
+          <div className="pt-2">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn-primary text-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Character</span>
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {characters.map((char) => (
             <CharacterCard
               key={char.id}
@@ -161,7 +167,7 @@ export default function CharacterStudioPage() {
         </div>
       )}
 
-      {/* Create Character Modal Dialog */}
+      {/* Create Modal Dialog */}
       {isCreateModalOpen && (
         <CreateCharacterModal
           onClose={() => setIsCreateModalOpen(false)}
@@ -169,7 +175,7 @@ export default function CharacterStudioPage() {
         />
       )}
 
-      {/* Character DNA Inspector Modal */}
+      {/* DNA Inspector Modal */}
       {selectedCharacter && (
         <CharacterDNAInspector
           character={selectedCharacter}

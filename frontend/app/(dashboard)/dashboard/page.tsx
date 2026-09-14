@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles, Film, CheckCircle2, FolderSync, Plus, Play } from "lucide-react";
+import { Plus, Film, CheckCircle2, Clock, ArrowRight, Video } from "lucide-react";
 import { projectsApi, Project } from "@/lib/api/projects";
 
 export default function DashboardPage() {
@@ -21,124 +21,137 @@ export default function DashboardPage() {
   const draftCount = projects.filter((p) => p.status !== "completed").length;
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div className="p-8 rounded-3xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-[#0D1322] border border-indigo-500/20 relative overflow-hidden">
-        <div className="max-w-2xl relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-4">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>AI Shorts & Reels Generator</span>
+    <div className="max-w-6xl mx-auto space-y-8">
+      {/* ─── Creative Hero Workspace Banner ────────────────────────────────── */}
+      <section className="p-6 sm:p-8 rounded-2xl bg-[#141517] border border-[#24272E] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="space-y-2 max-w-xl">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#E0693B]/10 border border-[#E0693B]/25 text-[#E0693B] text-[11px] font-semibold tracking-wide uppercase">
+            <span>Video Creation Studio</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
-            Create AI Shorts in Seconds
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#F2F2F3] tracking-tight">
+            Transform Scripts into Vertical Videos
           </h1>
-          <p className="text-sm text-gray-300 leading-relaxed mb-6">
-            Paste your script, select an AI style & narrator, and generate vertical 1080×1920 videos ready for YouTube Shorts, Reels, and TikTok.
+          <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+            Automated scene splitting, Character Memory Engine (CME) visual consistency, native Indian voiceover narration, and server-side 1080×1920 MP4 rendering.
           </p>
-
-          <Link
-            href="/projects/new"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Video</span>
-          </Link>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-            <Film className="w-6 h-6" />
+        <Link
+          href="/projects/new"
+          className="btn-primary w-full sm:w-auto text-sm px-6 py-3 shadow-sm flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create New Video</span>
+        </Link>
+      </section>
+
+      {/* ─── Functional Project Counts ──────────────────────────────────────── */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 sm:p-5 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-[#1B1D21] border border-[#24272E] flex items-center justify-center text-neutral-300">
+            <Film className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">{projects.length}</div>
-            <div className="text-xs text-gray-400">Total Projects</div>
+            <div className="text-xl font-bold text-[#F2F2F3]">{projects.length}</div>
+            <div className="text-xs text-neutral-400">Total Projects</div>
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-            <CheckCircle2 className="w-6 h-6" />
+        <div className="p-4 sm:p-5 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-[#2EB88A]/10 border border-[#2EB88A]/25 flex items-center justify-center text-[#2EB88A]">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">{completedCount}</div>
-            <div className="text-xs text-gray-400">Completed Videos</div>
+            <div className="text-xl font-bold text-[#F2F2F3]">{completedCount}</div>
+            <div className="text-xs text-neutral-400">Completed Videos</div>
           </div>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#0D1322] border border-gray-800 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-600/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-            <FolderSync className="w-6 h-6" />
+        <div className="p-4 sm:p-5 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-[#E5A43B]/10 border border-[#E5A43B]/25 flex items-center justify-center text-[#E5A43B]">
+            <Clock className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-white">{draftCount}</div>
-            <div className="text-xs text-gray-400">In Progress / Drafts</div>
+            <div className="text-xl font-bold text-[#F2F2F3]">{draftCount}</div>
+            <div className="text-xs text-neutral-400">Drafts / In Progress</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Recent Projects */}
-      <div className="space-y-4">
+      {/* ─── Recent Projects Workspace ─────────────────────────────────────── */}
+      <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Recent Projects</h2>
-          <Link href="/projects" className="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
-            View All →
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-[#F2F2F3]">Recent Projects</h2>
+            <p className="text-xs text-neutral-400">Continue editing your recent video timelines</p>
+          </div>
+          <Link
+            href="/projects"
+            className="text-xs font-medium text-[#E0693B] hover:text-[#EB794D] flex items-center gap-1 transition-colors"
+          >
+            <span>View All</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500 text-sm">Loading projects...</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-44 rounded-xl bg-[#141517] border border-[#24272E] animate-pulse" />
+            ))}
+          </div>
         ) : projects.length === 0 ? (
-          <div className="p-8 rounded-2xl border border-dashed border-gray-800 bg-[#0D1322]/50 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-gray-800/50 flex items-center justify-center mx-auto text-gray-500">
-              <Film className="w-6 h-6" />
+          <div className="p-10 rounded-xl border border-dashed border-[#24272E] bg-[#141517]/40 text-center space-y-3">
+            <div className="w-12 h-12 rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-center mx-auto text-neutral-400">
+              <Video className="w-5 h-5" />
             </div>
-            <div className="text-sm font-semibold text-gray-300">No projects yet</div>
-            <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              Start by creating your first script-to-video project.
+            <div className="text-sm font-semibold text-[#F2F2F3]">No video projects yet</div>
+            <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+              Start by pasting your script or creating a new vertical video project.
             </p>
-            <Link
-              href="/projects/new"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white font-medium text-xs shadow-md shadow-indigo-600/20"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Project</span>
-            </Link>
+            <div className="pt-2">
+              <Link href="/projects/new" className="btn-primary text-xs">
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create First Project</span>
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {projects.map((p) => (
               <Link
                 key={p.id}
                 href={`/projects/${p.id}/editor`}
-                className="p-5 rounded-2xl bg-[#0D1322] border border-gray-800 hover:border-indigo-500/50 transition-all group flex flex-col justify-between h-44"
+                className="group p-5 rounded-xl bg-[#141517] border border-[#24272E] hover:border-[#333742] hover:bg-[#1B1D21]/50 transition-all flex flex-col justify-between h-48"
               >
-                <div>
-                  <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="px-2 py-0.5 rounded bg-[#1B1D21] border border-[#24272E] text-neutral-300 text-[11px] font-medium">
                       {p.style}
                     </span>
-                    <span className="capitalize">{p.status}</span>
+                    <span className="text-[10px] text-neutral-500 font-mono">
+                      {new Date(p.created_at).toLocaleDateString()}
+                    </span>
                   </div>
-                  <h3 className="font-bold text-white group-hover:text-indigo-400 transition-colors line-clamp-2">
+                  <h3 className="font-semibold text-sm text-[#F2F2F3] group-hover:text-[#E0693B] transition-colors line-clamp-2">
                     {p.title}
                   </h3>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-800/80 text-xs text-gray-400">
-                  <span>{new Date(p.created_at).toLocaleDateString()}</span>
-                  <div className="flex items-center gap-1 text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
-                    <span>Studio</span>
-                    <Play className="w-3 h-3 fill-indigo-400" />
-                  </div>
+                <div className="pt-3 border-t border-[#24272E] flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-neutral-400">
+                    {p.status === "completed" ? "✅ Completed" : "✏️ In Studio"}
+                  </span>
+                  <span className="text-[11px] font-medium text-[#E0693B] group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                    <span>Open Editor</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </span>
                 </div>
               </Link>
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

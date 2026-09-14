@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
-import { X, Sparkles, UserCheck, ShieldCheck } from "lucide-react";
+import { X, UserCheck } from "lucide-react";
 import { Character, charactersApi } from "@/lib/api/characters";
 
 interface CreateCharacterModalProps {
@@ -17,7 +17,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
   const [hairColor, setHairColor] = useState("Black");
   const [skinTone, setSkinTone] = useState("Medium");
   const [outfit, setOutfit] = useState("Casual shirt and denim jeans");
-  const [visualStyle, setVisualStyle] = useState("Pixar 3D Render");
+  const [visualStyle, setVisualStyle] = useState("Cinematic photorealistic");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,144 +56,133 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg p-6 rounded-3xl bg-[#0D1322] border border-gray-800 shadow-2xl relative space-y-6">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-2xl bg-[#141517] border border-[#24272E] shadow-2xl relative space-y-4">
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-gray-800 pb-4">
+        <div className="flex items-center justify-between border-b border-[#24272E] pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400">
-              <UserCheck className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-[#1B1D21] border border-[#24272E] text-[#E0693B]">
+              <UserCheck className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Create AI Character Profile</h2>
-              <p className="text-xs text-gray-400">Lock persistent DNA identity across all video scenes</p>
+              <h2 className="text-sm font-bold text-[#F2F2F3]">Create Character Profile</h2>
+              <p className="text-[11px] text-neutral-400">Lock persistent visual identity for video scenes</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-[#1B1D21] transition-colors"
+            aria-label="Close modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+          <div className="p-3 rounded-lg bg-[#E55353]/10 border border-[#E55353]/25 text-[#E55353] text-xs">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Character Name</label>
+              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Character Name</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Rahul, Dr. Sharma"
-                className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                placeholder="e.g. Rahul, Dr. Sen"
+                className="input-base text-xs"
               />
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Story Role</label>
-              <select
+              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Story Role</label>
+              <input
+                type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value="Protagonist">Protagonist (Hero)</option>
-                <option value="Antagonist">Antagonist (Villain)</option>
-                <option value="Mentor">Mentor / Guide</option>
-                <option value="Supporting">Supporting Character</option>
-              </select>
+                placeholder="Protagonist, Mentor..."
+                className="input-base text-xs"
+              />
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2.5">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Age</label>
+              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Age</label>
               <input
                 type="number"
-                min="1"
-                max="100"
                 value={age}
                 onChange={(e) => setAge(Number(e.target.value))}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="input-base text-xs"
               />
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Gender</label>
+              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Gender</label>
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="input-base text-xs py-2"
               >
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
-                <option value="Non-binary">Non-binary</option>
+                <option value="Non-Binary">Non-Binary</option>
               </select>
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Hair Color</label>
+              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Skin Tone</label>
               <input
                 type="text"
-                value={hairColor}
-                onChange={(e) => setHairColor(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
+                value={skinTone}
+                onChange={(e) => setSkinTone(e.target.value)}
+                placeholder="Fair, Medium, Dark"
+                className="input-base text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Locked Outfit Description</label>
+            <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Hair Style & Color</label>
             <input
               type="text"
-              value={outfit}
-              onChange={(e) => setOutfit(e.target.value)}
-              placeholder="e.g. Yellow hoodie and black sunglasses"
-              className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+              value={hairColor}
+              onChange={(e) => setHairColor(e.target.value)}
+              placeholder="e.g. Short black hair, side part"
+              className="input-base text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 uppercase mb-1">Art / Visual Style</label>
-            <select
+            <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Locked Outfit</label>
+            <input
+              type="text"
+              value={outfit}
+              onChange={(e) => setOutfit(e.target.value)}
+              placeholder="e.g. Navy blue blazer, white collared shirt"
+              className="input-base text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Visual Render Style</label>
+            <input
+              type="text"
               value={visualStyle}
               onChange={(e) => setVisualStyle(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl bg-[#090D16] border border-gray-800 text-xs text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="Pixar 3D Render">Pixar 3D Render</option>
-              <option value="Photorealistic 8K">Photorealistic 8K Cinema</option>
-              <option value="Anime Studio Ghibli">Anime Studio Ghibli</option>
-              <option value="Cyberpunk Digital Art">Cyberpunk Digital Art</option>
-            </select>
+              placeholder="e.g. Cinematic photorealistic 8k render"
+              className="input-base text-xs"
+            />
           </div>
 
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
-            <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-            <span>Character DNA will be locked automatically for 100% prompt consistency.</span>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-gray-800 text-xs text-gray-300 hover:text-white transition-colors"
-            >
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#24272E]">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50"
-            >
-              {loading ? "Creating Character..." : "Create Character DNA"}
+            <button type="submit" disabled={loading} className="btn-primary text-xs shadow-sm">
+              {loading ? "Creating..." : "Save Character DNA"}
             </button>
           </div>
         </form>

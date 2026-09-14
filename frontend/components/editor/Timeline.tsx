@@ -1,12 +1,13 @@
 "use client";
 
 import { useEditorStore } from "@/lib/stores/editorStore";
-import { Layers } from "lucide-react";
-
+import { Layers, Clock } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api/client";
 
 export default function Timeline() {
   const { scenes, activeSceneIndex, activeSceneId, setActiveSceneId, setActiveSceneIndex } = useEditorStore();
+
+  const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
 
   const getSceneImageUrl = (scene: any) => {
     const imageAsset = scene?.assets?.find((a: any) => a.asset_type === "image");
@@ -30,18 +31,21 @@ export default function Timeline() {
   };
 
   return (
-    <div className="h-44 border-t border-gray-800 bg-[#0D1322] flex flex-col justify-between p-4">
+    <div className="h-40 border-t border-[#24272E] bg-[#141517] flex flex-col justify-between p-3 sm:p-4 select-none">
       {/* Track Header */}
-      <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-        <div className="flex items-center gap-2 font-semibold text-white">
-          <Layers className="w-4 h-4 text-indigo-400" />
-          <span>Scene Timeline Tracks ({scenes.length})</span>
+      <div className="flex items-center justify-between text-xs text-neutral-400 mb-1.5">
+        <div className="flex items-center gap-2 font-semibold text-[#F2F2F3]">
+          <Layers className="w-3.5 h-3.5 text-[#E0693B]" />
+          <span>Timeline Tracks ({scenes.length} Scenes)</span>
         </div>
-        <div className="text-[11px]">Click scene card to select and inspect</div>
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-400">
+          <Clock className="w-3 h-3 text-[#E0693B]" />
+          <span>Total: {totalDuration.toFixed(1)}s</span>
+        </div>
       </div>
 
       {/* Horizontal Scenes Track */}
-      <div className="flex-1 flex items-center gap-3 overflow-x-auto py-1 scrollbar-thin scrollbar-thumb-gray-800">
+      <div className="flex-1 flex items-center gap-2.5 overflow-x-auto py-1 scrollbar-thin">
         {scenes.map((scene, index) => {
           const isActive = index === activeSceneIndex || scene.id === activeSceneId;
           const imageUrl = getSceneImageUrl(scene);
@@ -55,10 +59,10 @@ export default function Timeline() {
             <div
               key={scene.id || index}
               onClick={handleSelect}
-              className={`flex-shrink-0 w-36 h-28 rounded-xl border cursor-pointer relative overflow-hidden transition-all group ${
+              className={`flex-shrink-0 w-32 sm:w-36 h-24 rounded-lg border cursor-pointer relative overflow-hidden transition-all group ${
                 isActive
-                  ? "border-indigo-500 ring-2 ring-indigo-500/50 scale-[1.02]"
-                  : "border-gray-800 hover:border-gray-700 bg-black/40"
+                  ? "border-[#E0693B] ring-1 ring-[#E0693B] shadow-md shadow-[#E0693B]/20 scale-[1.02]"
+                  : "border-[#24272E] hover:border-[#333742] bg-[#0C0D0E]"
               }`}
             >
               {/* Background Scene Image */}
@@ -70,22 +74,22 @@ export default function Timeline() {
                     e.currentTarget.src = `${API_BASE_URL}/ai/image-proxy?url=${encodeURIComponent(imageUrl)}`;
                   }
                 }}
-                className="w-full h-full object-cover opacity-70 group-hover:opacity-90 transition-opacity"
+                className="w-full h-full object-cover opacity-75 group-hover:opacity-90 transition-opacity"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/60" />
 
               {/* Scene Number Badge */}
-              <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-bold text-white border border-white/10">
+              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-white border border-white/10 font-mono">
                 #{scene.scene_number}
               </div>
 
               {/* Duration Badge */}
-              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-indigo-600/80 text-[10px] font-bold text-white">
+              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#141517]/90 text-[10px] font-medium text-neutral-300 border border-[#24272E] font-mono">
                 {scene.duration || 5}s
               </div>
 
-              {/* Narration Teaser */}
-              <div className="absolute bottom-2 left-2 right-2 text-[10px] text-gray-200 line-clamp-1 font-medium">
+              {/* Narration Preview */}
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-neutral-200 line-clamp-1 font-medium">
                 {(scene.narration || "").replace(/\*\*/g, "")}
               </div>
             </div>

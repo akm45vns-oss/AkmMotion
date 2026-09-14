@@ -8,7 +8,6 @@ import {
   Film, 
   UserCheck,
   Settings, 
-  Sparkles,
   LogOut 
 } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
@@ -26,20 +25,23 @@ export default function Sidebar() {
   const logout = useUserStore((state) => state.logout);
 
   return (
-    <aside className="w-64 border-r border-gray-800/80 bg-[#090D16] flex flex-col justify-between hidden md:flex min-h-screen sticky top-0">
+    <aside className="w-60 border-r border-[#24272E] bg-[#141517] flex flex-col justify-between hidden md:flex min-h-screen sticky top-0 select-none">
       <div>
         {/* Brand Header */}
-        <div className="h-16 px-6 border-b border-gray-800/80 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-500 flex items-center justify-center font-bold text-white shadow-md shadow-indigo-500/20">
+        <div className="h-16 px-5 border-b border-[#24272E] flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-[#E0693B] flex items-center justify-center font-bold text-white text-sm shadow-sm">
             A
           </div>
-          <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-            AkmMotion
-          </span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-bold text-[#F2F2F3] tracking-tight">
+              AkmMotion
+            </span>
+            <span className="text-[10px] text-neutral-400 font-medium">Studio</span>
+          </div>
         </div>
 
         {/* Navigation Links */}
-        <nav className="p-4 space-y-1.5">
+        <nav className="p-3 space-y-1">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -49,9 +51,9 @@ export default function Sidebar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-sm shadow-lg shadow-indigo-600/20 hover:from-indigo-500 hover:to-purple-500 transition-all mb-4"
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[#E0693B] hover:bg-[#EB794D] text-white font-semibold text-xs transition-colors mb-3 shadow-sm"
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <Icon className="w-4 h-4" />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -61,13 +63,13 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
                   isActive
-                    ? "bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 font-semibold"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                    ? "bg-[#1B1D21] text-white border border-[#333742] font-semibold"
+                    : "text-neutral-400 hover:text-[#F2F2F3] hover:bg-[#1B1D21]/60"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${isActive ? "text-[#E0693B]" : "text-neutral-400"}`} />
                 <span>{item.name}</span>
               </Link>
             );
@@ -75,11 +77,11 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* User Footer */}
-      <div className="p-4 border-t border-gray-800/80">
+      {/* User / Sign Out Footer */}
+      <div className="p-3 border-t border-[#24272E]">
         <button
           onClick={logout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 text-sm font-medium transition-all"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-400 hover:text-[#E55353] hover:bg-[#E55353]/10 text-xs font-medium transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>
