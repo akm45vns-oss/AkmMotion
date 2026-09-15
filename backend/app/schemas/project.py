@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
@@ -7,6 +7,7 @@ from app.schemas.script import ScriptResponse
 
 
 class ProjectBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     title: str
     description: Optional[str] = None
     style: str = "Explainer"
@@ -14,10 +15,12 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
+    model_config = ConfigDict(extra="forbid")
     script_content: Optional[str] = None
 
 
 class ProjectUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     title: Optional[str] = None
     description: Optional[str] = None
     style: Optional[str] = None

@@ -12,13 +12,51 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.router import api_router
 
+is_prod = settings.ENVIRONMENT.lower() in ["production", "prod"]
+show_docs = not is_prod or settings.ENABLE_API_DOCS
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    openapi_url="/api/v1/openapi.json",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    openapi_url="/api/v1/openapi.json" if show_docs else None,
+    docs_url="/docs" if show_docs else None,
+    redoc_url="/redoc" if show_docs else None
 )
+
+# Global Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    is_https = (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto", "").lower() == "https"
+        or is_prod
+    )
+    if is_https:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    return response
+
+# Global Exception Sanitization Handler (blocks leaking DB / stack details in production)
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    from fastapi.responses import JSONResponse
+    import logging
+    logging.getLogger("uvicorn.error").error(f"Unhandled Exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    if is_prod:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "An internal server error occurred. Please contact support."}
+        )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)}
+    )
 
 # Set up CORS
 # Build origins list: always include localhost + any extra origins from env
@@ -35,7 +73,7 @@ for _o in settings.cors_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://akm-motion(-[a-z0-9-]+)?\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

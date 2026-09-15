@@ -1,10 +1,11 @@
-﻿from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID, uuid4
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CharacterDNA(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     character_code: str = Field(default_factory=lambda: f"CHR_{uuid4().hex[:6].upper()}")
     age: int = 25
     gender: str = "Male"
@@ -47,6 +48,7 @@ class CharacterVersion(BaseModel):
 
 
 class CharacterBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
     role: str = "Protagonist"
     description: Optional[str] = None
@@ -57,10 +59,12 @@ class CharacterBase(BaseModel):
 
 
 class CharacterCreate(CharacterBase):
+    model_config = ConfigDict(extra="forbid")
     project_id: Optional[UUID] = None
 
 
 class CharacterUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: Optional[str] = None
     role: Optional[str] = None
     description: Optional[str] = None
@@ -71,7 +75,9 @@ class CharacterUpdate(BaseModel):
 
 
 class CharacterResponse(CharacterBase):
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
     id: UUID
+    character_code: Optional[str] = None
     project_id: Optional[UUID] = None
     user_id: UUID
     versions: List[CharacterVersion] = Field(default_factory=list)
@@ -79,9 +85,6 @@ class CharacterResponse(CharacterBase):
     consistency_score: int = 95
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class PromptInjectionSpec(BaseModel):

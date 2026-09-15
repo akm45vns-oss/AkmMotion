@@ -24,7 +24,18 @@ class CharacterMemoryService:
 
     async def create_character(self, user_id: uuid.UUID, data: CharacterCreate) -> DBCharacter:
         from app.core.dependencies import ensure_user_in_db
+        from app.models.models import Project
+        from fastapi import HTTPException, status
         await ensure_user_in_db(self.db, user_id)
+
+        if data.project_id:
+            proj_stmt = select(Project).where(Project.id == data.project_id, Project.user_id == user_id)
+            proj_res = await self.db.execute(proj_stmt)
+            if not proj_res.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Project not found or access denied."
+                )
 
         character = DBCharacter(
             user_id=user_id,
@@ -78,7 +89,7 @@ class CharacterMemoryService:
         # Store in <100ms Cache
         CharacterCache.set(str(character.id), dna_dict)
 
-        return await self.get_character_by_id(character.id)
+        return await self.get_character_by_id(character.id, user_id=user_id)
 
     async def get_character_by_id(self, character_id: uuid.UUID, user_id: Optional[uuid.UUID] = None) -> Optional[DBCharacter]:
         # Fast Cache Lookup

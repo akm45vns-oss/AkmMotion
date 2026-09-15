@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.1.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    ENABLE_API_DOCS: bool = False
 
     # App URLs
     FRONTEND_URL: str = "http://localhost:3000"

@@ -13,7 +13,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db, get_current_user_id
-from app.core.rate_limit import rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen, rate_limit_pipeline
+from app.core.rate_limit import rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen, rate_limit_pipeline, rate_limit_image_proxy
 from app.schemas.project import ProjectResponse
 from app.services.ai_pipeline_service import AIPipelineService
 from app.services.ai.subtitle_generator import SubtitleGeneratorService
@@ -168,7 +168,11 @@ async def get_word_timings(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/image-proxy")
-async def image_proxy(url: str):
+async def image_proxy(
+    url: str,
+    current_user_id: str = Depends(get_current_user_id),
+    _: bool = Depends(rate_limit_image_proxy)
+):
     """
     Server-side image proxy that fetches external images and returns them
     with CORS headers, bypassing browser canvas taint restrictions.
@@ -479,7 +483,7 @@ async def list_video_styles():
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/groq-status")
-async def groq_key_status():
+async def groq_key_status(current_user_id: str = Depends(get_current_user_id)):
     """
     Returns health status of all configured Groq API keys.
     Shows which keys are available/cooling down without exposing actual key values.

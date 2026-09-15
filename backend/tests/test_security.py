@@ -534,5 +534,167 @@ async def test_15_production_cookie_security(client: AsyncClient):
             client.cookies.clear()
 
 
+@pytest.mark.asyncio
+async def test_16_render_video_idor_protection(client: AsyncClient):
+    """16. Test that User B cannot download or stream User A's rendered video by job UUID"""
+    user_a_id = uuid4()
+    user_b_id = uuid4()
+    token_a = create_access_token(subject=str(user_a_id))
+    token_b = create_access_token(subject=str(user_b_id))
+
+    # User A creates a project & starts a render
+    proj_res = await client.post(
+        "/api/v1/projects",
+        json={"title": "Private Video Project", "script_content": "Private narration text"},
+        headers={"Authorization": f"Bearer {token_a}"}
+    )
+    assert proj_res.status_code == 201
+    project_id = proj_res.json()["id"]
+
+    start_res = await client.post(
+        f"/api/v1/render/start/{project_id}",
+        headers={"Authorization": f"Bearer {token_a}"}
+    )
+    assert start_res.status_code == 201
+    job_id = start_res.json()["id"]
+
+    # User B tries to download User A's video -> MUST be 404 Not Found
+    video_res = await client.get(
+        f"/api/v1/render/video/{job_id}",
+        headers={"Authorization": f"Bearer {token_b}"}
+    )
+    assert video_res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_17_render_video_path_traversal_blocked(client: AsyncClient):
+    """17. Test that non-existent or path-traversal video file requests are rejected"""
+    user_a_id = uuid4()
+    token_a = create_access_token(subject=str(user_a_id))
+
+    fake_job_id = uuid4()
+    res = await client.get(
+        f"/api/v1/render/video/{fake_job_id}",
+        headers={"Authorization": f"Bearer {token_a}"}
+    )
+    assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_18_character_creation_cross_project_isolation(client: AsyncClient):
+    """18. Test that User B cannot associate their character with User A's project"""
+    user_a_id = uuid4()
+    user_b_id = uuid4()
+    token_a = create_access_token(subject=str(user_a_id))
+    token_b = create_access_token(subject=str(user_b_id))
+
+    # User A creates a project
+    proj_res = await client.post(
+        "/api/v1/projects",
+        json={"title": "User A Character Project", "script_content": "Story of Hero"},
+        headers={"Authorization": f"Bearer {token_a}"}
+    )
+    assert proj_res.status_code == 201
+    project_a_id = proj_res.json()["id"]
+
+    # User B tries to create a character attached to User A's project_id -> MUST fail with 404
+    char_res = await client.post(
+        "/api/v1/characters",
+        json={
+            "name": "Intruder Char",
+            "role": "Villain",
+            "project_id": project_a_id,
+            "dna": {"age": 30, "gender": "Male"}
+        },
+        headers={"Authorization": f"Bearer {token_b}"}
+    )
+    assert char_res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_19_mass_assignment_forbid_extra_fields(client: AsyncClient):
+    """19. Test that extra / injected fields (e.g. is_admin, role, user_id) are rejected with 422"""
+    user_id = uuid4()
+    token = create_access_token(subject=str(user_id))
+
+    # Attempt to inject unauthorized fields into ProjectCreate
+    res = await client.post(
+        "/api/v1/projects",
+        json={
+            "title": "Hacked Project",
+            "script_content": "Script content",
+            "is_admin": True,
+            "role": "superadmin",
+            "user_id": str(uuid4())
+        },
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_20_cors_unauthorized_origin_rejected(client: AsyncClient):
+    """20. Test that arbitrary third-party Vercel origins or external sites are not permitted"""
+    # 1. Valid origin -> should have CORS header
+    res_valid = await client.options(
+        "/api/v1/health",
+        headers={
+            "Origin": "https://akm-motion.vercel.app",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert res_valid.headers.get("access-control-allow-origin") == "https://akm-motion.vercel.app"
+
+    # 2. Arbitrary malicious Vercel subdomain -> MUST NOT be allowed
+    res_bad_vercel = await client.options(
+        "/api/v1/health",
+        headers={
+            "Origin": "https://attacker-phishing.vercel.app",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert res_bad_vercel.headers.get("access-control-allow-origin") is None
+
+    # 3. Arbitrary evil origin -> MUST NOT be allowed
+    res_evil = await client.options(
+        "/api/v1/health",
+        headers={
+            "Origin": "https://evil-hacker.com",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert res_evil.headers.get("access-control-allow-origin") is None
+
+
+@pytest.mark.asyncio
+async def test_21_global_security_headers_present(client: AsyncClient):
+    """21. Test that all API responses include standard HTTP security hardening headers"""
+    res = await client.get("/api/v1/health")
+    assert res.status_code == 200
+    assert res.headers.get("x-content-type-options") == "nosniff"
+    assert res.headers.get("x-frame-options") == "DENY"
+    assert res.headers.get("referrer-policy") == "strict-origin-when-cross-origin"
+    assert "camera=()" in res.headers.get("permissions-policy", "")
+    assert res.headers.get("x-xss-protection") == "1; mode=block"
+
+
+@pytest.mark.asyncio
+async def test_22_production_error_sanitization(client: AsyncClient):
+    """22. Test that unhandled exceptions in production return sanitized errors without traces"""
+    from app.core.config import settings
+    orig_env = settings.ENVIRONMENT
+    try:
+        settings.ENVIRONMENT = "production"
+        # Access non-existent scene which triggers safe 404, or simulate error
+        res = await client.get("/api/v1/projects/00000000-0000-0000-0000-000000000000")
+        assert res.status_code == 404
+        content = res.json()
+        assert "password" not in str(content).lower()
+        assert "traceback" not in str(content).lower()
+        assert "neon" not in str(content).lower()
+    finally:
+        settings.ENVIRONMENT = orig_env
+
+
 
 

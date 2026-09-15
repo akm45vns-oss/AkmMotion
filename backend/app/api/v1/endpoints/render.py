@@ -74,6 +74,12 @@ async def get_render_video(
     if not real_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video file not found on disk")
 
+    # Prevent path traversal attacks outside the allowed storage directory
+    canonical_base = os.path.realpath(settings.video_storage_dir)
+    canonical_file = os.path.realpath(real_path)
+    if not canonical_file.startswith(canonical_base):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
     filename = f"akmmotion_{str(job.project_id)[:8]}.mp4"
     return FileResponse(
         path=real_path,

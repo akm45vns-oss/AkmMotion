@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Optional, List, Any
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
@@ -35,6 +35,7 @@ class SceneCreate(SceneBase):
 
 
 class SceneUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     narration: Optional[str] = None
     subtitle: Optional[str] = None
     image_prompt: Optional[str] = None
