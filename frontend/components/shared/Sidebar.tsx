@@ -11,6 +11,7 @@ import {
   LogOut 
 } from "lucide-react";
 import { useUserStore } from "@/lib/stores/userStore";
+import Logo from "@/components/shared/Logo";
 
 const primaryNav = [
   { name: "Home", href: "/dashboard", icon: Home },
@@ -26,16 +27,11 @@ export default function Sidebar() {
     <aside className="w-56 border-r border-[#292A29] bg-[#151616] flex flex-col justify-between hidden md:flex min-h-screen sticky top-0 select-none z-20">
       <div>
         {/* Brand Header */}
-        <div className="h-14 px-4 border-b border-[#292A29] flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#E76536] flex items-center justify-center font-bold text-white text-xs shadow-sm">
-            A
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-[#F5F1E8] tracking-tight">
-              AkmMotion
-            </span>
-            <span className="text-[10px] font-mono text-[#77746E]">Studio</span>
-          </div>
+        <div className="h-14 px-4 border-b border-[#292A29] flex items-center justify-between">
+          <Logo href="/dashboard" size="md" />
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1B1C1C] border border-[#292A29] text-[#77746E]">
+            v7.3
+          </span>
         </div>
 
         {/* Primary Action: New Video */}

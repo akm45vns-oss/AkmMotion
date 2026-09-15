@@ -3,6 +3,7 @@
 import { useUserStore } from "@/lib/stores/userStore";
 import { User } from "lucide-react";
 import Link from "next/link";
+import Logo from "@/components/shared/Logo";
 
 export default function Navbar() {
   const user = useUserStore((state) => state.user);
@@ -11,12 +12,7 @@ export default function Navbar() {
     <header className="h-14 border-b border-[#292A29] bg-[#151616]/95 backdrop-blur-md sticky top-0 z-40 px-4 md:px-6 flex items-center justify-between">
       {/* Mobile Brand Mark */}
       <div className="flex md:hidden items-center gap-2">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-[#E76536] flex items-center justify-center font-bold text-white text-xs shadow-sm">
-            A
-          </div>
-          <span className="text-xs font-bold text-[#F5F1E8] tracking-tight">AkmMotion</span>
-        </Link>
+        <Logo href="/dashboard" size="sm" />
       </div>
 
       {/* Desktop Workspace Label */}

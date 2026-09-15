@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Logo from "@/components/shared/Logo";
 import {
   Wand2,
   ShieldCheck,
@@ -22,17 +23,10 @@ export default function LandingPage() {
       {/* Editorial Header */}
       <header className="border-b border-[#292A29] bg-[#0D0E0E]/90 backdrop-blur-md sticky top-0 z-50 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md bg-[#E76536] flex items-center justify-center font-bold text-[#F5F1E8] text-base shadow-sm font-display">
-            A
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold tracking-tight text-[#F5F1E8] font-display">
-              AkmMotion
-            </span>
-            <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded border border-[#292A29] bg-[#151616] text-[#A9A49B]">
-              STUDIO v7.3
-            </span>
-          </div>
+          <Logo href="/" size="md" />
+          <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded border border-[#292A29] bg-[#151616] text-[#A9A49B]">
+            STUDIO v7.3
+          </span>
         </div>
 
         <nav className="flex items-center gap-3 sm:gap-6">
@@ -352,10 +346,7 @@ export default function LandingPage() {
       <footer className="border-t border-[#292A29] py-6 px-4 sm:px-8 text-xs text-[#77746E] bg-[#0D0E0E]">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-[#E76536] font-bold text-[#F5F1E8] flex items-center justify-center text-[10px]">
-              A
-            </div>
-            <span className="font-semibold text-[#A9A49B]">AkmMotion Studio</span>
+            <Logo href="/" size="sm" />
             <span className="text-[#383938]">•</span>
             <span>Vertical AI Video Studio</span>
           </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/lib/api/auth";
 import { useUserStore } from "@/lib/stores/userStore";
+import Logo from "@/components/shared/Logo";
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -41,8 +42,8 @@ export default function RegisterForm() {
   return (
     <div className="w-full max-w-md p-6 sm:p-8 rounded-xl bg-[#151616] border border-[#292A29] shadow-2xl shadow-black/60">
       <div className="text-center mb-6">
-        <div className="inline-flex items-center justify-center w-10 h-10 rounded-md bg-[#E76536]/10 border border-[#E76536]/25 text-[#E76536] font-bold text-lg mb-3 font-display">
-          A
+        <div className="flex justify-center mb-3">
+          <Logo variant="icon" size="xl" />
         </div>
         <h2 className="text-xl sm:text-2xl font-semibold text-[#F5F1E8] tracking-tight font-display">Create your account</h2>
         <p className="text-xs sm:text-sm text-[#A9A49B] mt-1">Start creating AI videos with character consistency</p>

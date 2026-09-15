@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AkmMotion — AI Script-to-Video Platform",
   description: "Transform your scripts into stunning 1080x1920 YouTube Shorts, TikToks, and Reels powered by AI.",
+  icons: {
+    icon: "/logo-icon.png",
+    apple: "/logo-icon.png",
+  },
 };
 
 export default function RootLayout({
