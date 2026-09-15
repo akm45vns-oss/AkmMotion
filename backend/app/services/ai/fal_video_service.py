@@ -37,7 +37,8 @@ class FalVideoService:
     @property
     def api_key(self) -> str:
         key = settings.FAL_KEY or ""
-        return key.strip()
+        return key.replace("\n", "").replace("\r", "").replace(" ", "").strip()
+
 
     def _get_headers(self) -> Dict[str, str]:
         key = self.api_key
