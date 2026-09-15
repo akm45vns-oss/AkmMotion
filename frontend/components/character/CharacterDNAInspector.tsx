@@ -33,39 +33,39 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#141517] border border-[#24272E] shadow-2xl relative p-5 sm:p-6 space-y-5">
+      <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-xl bg-[#151616] border border-[#292A29] shadow-2xl relative p-5 sm:p-6 space-y-5">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-[#1B1D21] transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-md text-[#A9A49B] hover:text-[#F5F1E8] hover:bg-[#1B1C1C] transition-colors"
           aria-label="Close inspector"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#24272E] pb-3">
+        <div className="flex items-center justify-between border-b border-[#292A29] pb-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-[#1B1D21] border border-[#24272E] text-[#E0693B]">
+            <div className="p-2.5 rounded-lg bg-[#1B1C1C] border border-[#292A29] text-[#E76536]">
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#F2F2F3] flex items-center gap-2">
+              <h2 className="text-base font-bold text-[#F5F1E8] flex items-center gap-2 font-display">
                 <span>{name}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[#1B1D21] text-neutral-400 font-mono">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-[#1B1C1C] border border-[#292A29] text-[#77746E] font-mono">
                   {character.character_code}
                 </span>
               </h2>
-              <p className="text-xs text-neutral-400">Character Memory Engine DNA Profile</p>
+              <p className="text-xs text-[#A9A49B]">Character Memory Engine DNA Profile</p>
             </div>
           </div>
 
           <button
             onClick={() => setIsLocked(!isLocked)}
-            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1.5 rounded-md border text-xs font-semibold flex items-center gap-1.5 transition-colors touch-target ${
               isLocked
-                ? "bg-[#E0693B]/10 border-[#E0693B]/30 text-[#E0693B]"
-                : "bg-[#1B1D21] border-[#24272E] text-neutral-300"
+                ? "bg-[#E76536]/10 border-[#E76536]/30 text-[#E76536]"
+                : "bg-[#1B1C1C] border-[#292A29] text-[#A9A49B] hover:text-[#F5F1E8]"
             }`}
           >
             {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
@@ -75,12 +75,12 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
 
         {/* Demographics */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
+          <h3 className="text-xs font-bold text-[#F5F1E8] uppercase tracking-wider font-mono">
             1. Identity & Demographics
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Name</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Name</label>
               <input
                 type="text"
                 value={name}
@@ -89,7 +89,7 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
               />
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Role</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Role</label>
               <input
                 type="text"
                 value={role}
@@ -98,7 +98,7 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
               />
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Age</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Age</label>
               <input
                 type="number"
                 value={dna.age || 25}
@@ -111,12 +111,12 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
 
         {/* Appearance & Physical Traits */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
+          <h3 className="text-xs font-bold text-[#F5F1E8] uppercase tracking-wider font-mono">
             2. Appearance & Features
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Gender</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Gender</label>
               <select
                 value={dna.gender || "Male"}
                 onChange={(e) => handleChange("gender", e.target.value)}
@@ -128,7 +128,7 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
               </select>
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Skin Tone</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Skin Tone</label>
               <input
                 type="text"
                 value={dna.skin_tone || "Medium"}
@@ -137,7 +137,7 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
               />
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Hair Style & Color</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Hair Style & Color</label>
               <input
                 type="text"
                 value={dna.hair_color || "Black wavy hair"}
@@ -150,13 +150,13 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
 
         {/* Outfit & Visual Style */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Shirt className="w-3.5 h-3.5 text-[#E0693B]" />
+          <h3 className="text-xs font-bold text-[#F5F1E8] uppercase tracking-wider flex items-center gap-1.5 font-mono">
+            <Shirt className="w-3.5 h-3.5 text-[#E76536]" />
             <span>3. Outfit & Visual Style</span>
           </h3>
           <div className="space-y-2 text-xs">
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Locked Outfit Description</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Locked Outfit Description</label>
               <input
                 type="text"
                 value={dna.outfit || "Casual dark shirt and denim jeans"}
@@ -165,7 +165,7 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
               />
             </div>
             <div>
-              <label className="block text-[11px] text-neutral-400 mb-1">Visual Render Style</label>
+              <label className="block text-[11px] text-[#A9A49B] mb-1">Visual Render Style</label>
               <input
                 type="text"
                 value={dna.visual_style || "Cinematic photorealistic 8k render"}
@@ -177,11 +177,11 @@ export default function CharacterDNAInspector({ character, onClose, onSave }: Ch
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#24272E]">
-          <button onClick={onClose} className="btn-secondary text-xs">
+        <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#292A29]">
+          <button onClick={onClose} className="btn-secondary text-xs touch-target">
             Cancel
           </button>
-          <button onClick={handleSave} className="btn-primary text-xs shadow-sm">
+          <button onClick={handleSave} className="btn-primary text-xs shadow-sm touch-target">
             Save Character DNA
           </button>
         </div>

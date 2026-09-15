@@ -88,96 +88,99 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+    <div className="max-w-3xl mx-auto space-y-7 pb-16">
       {/* Header */}
-      <div className="border-b border-[#24272E] pb-4">
-        <h1 className="text-xl sm:text-2xl font-bold text-[#F2F2F3] tracking-tight">
-          Create New Video Project
+      <div className="border-b border-[#292A29] pb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#F5F1E8] tracking-tight">
+          CREATE NEW VIDEO
         </h1>
-        <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-          Paste your narrative script to generate 9:16 vertical scenes with character consistency and synchronized Indian voiceovers.
+        <p className="text-xs sm:text-sm text-[#77746E] mt-1">
+          Turn your script into a vertical video with scene splitting, visual prompts, and voice narration.
         </p>
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-[#E55353]/10 border border-[#E55353]/25 text-[#E55353] text-xs font-medium">
+        <div className="p-3 rounded-md bg-[#C95C5C]/10 border border-[#C95C5C]/25 text-[#C95C5C] text-xs font-medium">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Step 1: Project Title */}
-        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
-          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider">
-            1. Project Title
+      <form onSubmit={handleSubmit} className="space-y-7">
+        {/* Project Section */}
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-[#A9A49B] uppercase tracking-wider">
+            Project
           </label>
           <input
             type="text"
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. 5 Mind-Blowing Historical Mysteries"
-            className="input-base text-sm"
+            placeholder="Project title (e.g. 5 Mind-Blowing Historical Mysteries)"
+            className="input-base text-sm py-2.5"
           />
         </div>
 
-        {/* Step 2: Script Input */}
-        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
+        <div className="border-t border-[#292A29]" />
+
+        {/* Script Section */}
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Type className="w-3.5 h-3.5 text-[#E0693B]" />
-              <span>2. Script Text</span>
+            <label className="block text-xs font-semibold text-[#A9A49B] uppercase tracking-wider">
+              Script
             </label>
-            <div className="text-[11px] text-neutral-400 font-mono">
-              <span className="font-semibold text-[#F2F2F3]">{wordCount}</span> {wordCount === 1 ? "word" : "words"} · ~
-              <span className="font-semibold text-[#F2F2F3]">{estimatedSeconds}s</span> duration
+            <div className="text-[11px] text-[#77746E] font-mono">
+              <span className="font-semibold text-[#F5F1E8]">{wordCount}</span> {wordCount === 1 ? "word" : "words"} · ~
+              <span className="font-semibold text-[#F5F1E8]">{estimatedSeconds}s</span>
             </div>
           </div>
 
-          <textarea
-            rows={7}
-            required
-            value={scriptContent}
-            onChange={(e) => setScriptContent(e.target.value)}
-            placeholder="Paste your video script in English or Hindi here. The AI Director will segment it into vertical scenes, preserve your exact spoken words, and craft cinematic visual prompts..."
-            className="input-base text-xs sm:text-sm leading-relaxed resize-none"
-          />
+          <div className="relative rounded-lg border border-[#292A29] bg-[#151616] p-3 focus-within:border-[#E76536] focus-within:ring-1 focus-within:ring-[#E76536] transition-colors">
+            <textarea
+              rows={9}
+              required
+              value={scriptContent}
+              onChange={(e) => setScriptContent(e.target.value)}
+              placeholder="Paste or write your video script here. Every sentence and word of your script will be preserved exactly as narration and burned-in subtitles across the generated scenes..."
+              className="w-full bg-transparent border-0 p-0 text-sm text-[#F5F1E8] placeholder-[#77746E] leading-relaxed resize-none focus:outline-none focus:ring-0 font-normal"
+            />
+          </div>
         </div>
 
-        {/* Step 3: Style Selection */}
-        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
-          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Video className="w-3.5 h-3.5 text-[#E0693B]" />
-            <span>3. Visual Style</span>
+        <div className="border-t border-[#292A29]" />
+
+        {/* Visual Style Section */}
+        <div className="space-y-2.5">
+          <label className="block text-xs font-semibold text-[#A9A49B] uppercase tracking-wider">
+            Visual Style
           </label>
           <StyleSelector selected={style} onSelect={setStyle} />
         </div>
 
-        {/* Step 4: Voiceover Selection */}
-        <div className="p-5 rounded-xl bg-[#141517] border border-[#24272E] space-y-3">
-          <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
-            <Volume2 className="w-3.5 h-3.5 text-[#E0693B]" />
-            <span>4. Narration Voice</span>
+        {/* Narration Voice Section */}
+        <div className="space-y-2.5">
+          <label className="block text-xs font-semibold text-[#A9A49B] uppercase tracking-wider">
+            Narration Voice
           </label>
           <VoiceSelector selected={voice} onSelect={setVoice} />
         </div>
 
-        {/* Action Button */}
-        <div className="flex justify-end pt-2">
+        {/* Create Video Action */}
+        <div className="pt-2">
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full sm:w-auto px-7 py-3 text-sm flex items-center justify-center gap-2 touch-target shadow-md"
+            className="btn-primary w-full sm:w-auto min-h-[44px] px-8 text-xs font-semibold flex items-center justify-center gap-2 shadow-sm"
           >
             {loading ? (
               <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>{loadingMessage}</span>
               </>
             ) : (
               <>
-                <span>Generate Video Studio</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>CREATE VIDEO</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
               </>
             )}
           </button>

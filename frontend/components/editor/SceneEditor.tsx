@@ -156,221 +156,153 @@ export default function SceneEditor() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col justify-between overflow-y-auto bg-[#141517] border-l border-[#24272E]">
-      <div className="p-4 sm:p-5 space-y-5">
+    <div className="w-full h-full flex flex-col justify-between overflow-y-auto bg-[#151616] border-l border-[#292A29]">
+      <div className="p-4 sm:p-5 space-y-6">
         {/* ── Section Header ─────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between border-b border-[#24272E] pb-3">
-          <h2 className="text-xs font-bold text-[#F2F2F3] uppercase tracking-wider flex items-center gap-2">
-            <Sliders className="w-3.5 h-3.5 text-[#E0693B]" />
-            Scene #{activeScene.scene_number} Inspector
-          </h2>
+        <div className="flex items-center justify-between border-b border-[#292A29] pb-3">
+          <div>
+            <h2 className="text-xs font-bold text-[#F5F1E8] uppercase tracking-wider flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-[#E76536]" />
+              Scene #{activeScene.scene_number} Inspector
+            </h2>
+            <p className="text-[10px] text-[#77746E] mt-0.5 font-mono">
+              Scene timing: {duration}s · Vertical 9:16
+            </p>
+          </div>
           <div className="flex items-center gap-1.5">
             {activeScene.camera_motion && (
               <span className="camera-badge">
                 {activeScene.camera_motion.replace(/_/g, " ").toUpperCase()}
               </span>
             )}
-            <span className="text-[10px] px-2 py-0.5 rounded bg-[#1B1D21] border border-[#24272E] text-neutral-300 font-mono">
-              {duration}s
+          </div>
+        </div>
+
+        {/* ─────────────── 1. SCENE SCRIPT (USER-AUTHORITATIVE) ──────────── */}
+        <div className="space-y-1.5 rounded-lg p-3 bg-[#1B1C1C] border border-[#292A29]">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-[#F5F1E8] uppercase tracking-wider">
+              <Type className="w-3.5 h-3.5 text-[#4FAE7B]" />
+              <span>SCENE SCRIPT</span>
+            </label>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#4FAE7B]/10 border border-[#4FAE7B]/25 text-[#4FAE7B] font-semibold">
+              AUTHORITATIVE
             </span>
           </div>
-        </div>
-
-        {/* ─────────────── STYLE PRESET ──────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-            <Film className="w-3 h-3 text-[#E0693B]" />
-            <span>Style Preset</span>
-          </label>
-          <div className="grid grid-cols-3 gap-1.5">
-            {STYLE_PRESETS.map(({ id, label, emoji }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setStylePreset(id)}
-                className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-colors flex items-center justify-center gap-1 min-h-[36px] ${
-                  stylePreset === id
-                    ? "bg-[#E0693B]/10 border-[#E0693B] text-[#E0693B] font-semibold"
-                    : "bg-[#1B1D21] border-[#24272E] text-neutral-400 hover:text-white"
-                }`}
-              >
-                <span>{emoji}</span>
-                <span className="truncate">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ─────────────── VOICE PICKER ─────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-            <Mic2 className="w-3 h-3 text-[#E0693B]" />
-            <span>Voice Options</span>
-          </label>
-          <div className="p-3 rounded-xl bg-[#1B1D21] border border-[#24272E] space-y-2 text-xs">
-            {/* Language */}
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-400">Language</span>
-              <div className="flex gap-1">
-                {(["en", "hi"] as const).map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    onClick={() => setVoiceLang(l)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] border font-medium transition-colors ${
-                      voiceLang === l
-                        ? "bg-[#E0693B] border-[#E0693B] text-white"
-                        : "bg-[#141517] border-[#24272E] text-neutral-400 hover:text-white"
-                    }`}
-                  >
-                    {l === "en" ? "🇬🇧 English" : "🇮🇳 Hindi"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Gender */}
-            <div className="flex items-center justify-between">
-              <span className="text-neutral-400">Gender</span>
-              <div className="flex gap-1">
-                {(["male", "female"] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setVoiceGender(g)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] border font-medium transition-colors ${
-                      voiceGender === g
-                        ? "bg-[#E0693B] border-[#E0693B] text-white"
-                        : "bg-[#141517] border-[#24272E] text-neutral-400 hover:text-white"
-                    }`}
-                  >
-                    {g === "male" ? "👨 Male" : "👩 Female"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ─────────────── ASPECT RATIO ─────────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-            <Crop className="w-3 h-3 text-[#E0693B]" />
-            <span>Format</span>
-          </label>
-          <div className="px-3 py-2 rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-between text-xs">
-            <span className="font-semibold text-[#F2F2F3] flex items-center gap-2">
-              <span>📱</span> 9:16 Vertical (Shorts / Reels)
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-[#141517] border border-[#24272E] text-neutral-400 font-mono">
-              1080×1920
-            </span>
-          </div>
-        </div>
-
-        {/* ─────────────── SUBTITLE STYLE ───────────────────────────────── */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-            <Subtitles className="w-3 h-3 text-[#E0693B]" />
-            <span>Subtitle Layout</span>
-          </label>
-          <div className="grid grid-cols-3 gap-1.5">
-            {([
-              { id: "yellow-cyan" as const, label: "Word Sync" },
-              { id: "karaoke"    as const, label: "Karaoke" },
-              { id: "minimal"    as const, label: "Minimal" },
-            ]).map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setSubtitleStyle(id)}
-                className={`py-1.5 px-2 rounded-lg text-[11px] font-medium border text-center transition-colors min-h-[36px] ${
-                  subtitleStyle === id
-                    ? "bg-[#E0693B]/10 border-[#E0693B] text-[#E0693B] font-semibold"
-                    : "bg-[#1B1D21] border-[#24272E] text-neutral-400 hover:text-white"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ─────────────── NARRATION TEXT ───────────────────────────────── */}
-        <div className="space-y-1.5">
-          <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-            <Type className="w-3 h-3 text-[#E0693B]" />
-            <span>Narration Text</span>
-          </label>
+          <p className="text-[10px] text-[#77746E]">
+            Exact spoken narration — preserved verbatim for voiceover synthesis.
+          </p>
           <textarea
             rows={3}
             value={narration}
             onChange={(e) => setNarration(e.target.value)}
-            className="input-base text-xs leading-relaxed resize-none"
+            className="input-base text-xs leading-relaxed resize-none mt-1 font-normal"
+            placeholder="Scene narration text..."
           />
         </div>
 
-        {/* ─────────────── SUBTITLE CAPTION ─────────────────────────────── */}
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-neutral-300 uppercase tracking-wider block">
-            Burned-In Subtitle
-          </label>
+        {/* ─────────────── 2. BURNED-IN SUBTITLE ─────────────────────────── */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-[#A9A49B] uppercase tracking-wider flex items-center gap-1.5">
+              <Subtitles className="w-3.5 h-3.5 text-[#E76536]" />
+              <span>BURNED-IN SUBTITLE</span>
+            </label>
+          </div>
           <input
             type="text"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
             className="input-base text-xs"
+            placeholder="Subtitle text to display on screen..."
           />
-        </div>
 
-        {/* ─────────────── IMAGE PROMPT + REGEN ────────────────────────── */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-              <ImageIcon className="w-3 h-3 text-[#E0693B]" />
-              <span>Visual Prompt</span>
-            </label>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleEnhancePrompt}
-                disabled={enhanceLoading || regenLoading}
-                className="btn-ghost text-[10px] py-1 px-2 border border-[#24272E] disabled:opacity-40"
-                title="Optimize prompt with AI Director"
-              >
-                <Sparkles className={`w-2.5 h-2.5 text-[#E0693B] ${enhanceLoading ? "animate-spin" : ""}`} />
-                <span>{enhanceLoading ? "Writing..." : "AI Prompt"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleRegenerateImage}
-                disabled={regenLoading || enhanceLoading}
-                className={`text-[10px] py-1 px-2.5 rounded-md font-medium border transition-colors flex items-center gap-1 ${
-                  regenSuccess
-                    ? "border-[#2EB88A] text-[#2EB88A] bg-[#2EB88A]/10"
-                    : "border-[#E0693B]/40 text-[#E0693B] hover:bg-[#E0693B]/10"
-                } disabled:opacity-40 disabled:cursor-not-allowed`}
-              >
-                <RefreshCw className={`w-2.5 h-2.5 ${regenLoading ? "animate-spin" : ""}`} />
-                <span>{regenSuccess ? "Done!" : regenLoading ? "Generating..." : "Regen Visual"}</span>
-              </button>
+          {/* Subtitle Style Switcher */}
+          <div className="pt-1">
+            <span className="text-[10px] text-[#77746E] uppercase tracking-wider block mb-1">Layout Mode</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { id: "yellow-cyan" as const, label: "Word Sync" },
+                { id: "karaoke"    as const, label: "Karaoke" },
+                { id: "minimal"    as const, label: "Minimal" },
+              ]).map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSubtitleStyle(id)}
+                  className={`py-1.5 px-2 rounded-md text-[11px] font-medium border text-center transition-colors min-h-[32px] ${
+                    subtitleStyle === id
+                      ? "bg-[#1B1C1C] border-[#E76536] text-[#E76536] font-semibold ring-1 ring-[#E76536]"
+                      : "bg-[#151616] border-[#292A29] text-[#77746E] hover:text-[#F5F1E8]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
+        </div>
+
+        {/* ─────────────── 3. VISUAL PROMPT (AI GENERATED) ────────────────── */}
+        <div className="space-y-2 rounded-lg p-3 bg-[#1B1C1C] border border-[#292A29]">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-[#F5F1E8] uppercase tracking-wider">
+              <ImageIcon className="w-3.5 h-3.5 text-[#E76536]" />
+              <span>VISUAL PROMPT</span>
+            </label>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#E76536]/10 border border-[#E76536]/25 text-[#E76536] font-semibold">
+              AI INSTRUCTION
+            </span>
+          </div>
+          <p className="text-[10px] text-[#77746E]">
+            Cinematic visual prompt guiding image synthesis in 9:16 vertical framing.
+          </p>
           <textarea
             rows={3}
             value={imagePrompt}
             onChange={(e) => setImagePrompt(e.target.value)}
-            className="input-base text-xs leading-relaxed resize-none"
+            className="input-base text-xs leading-relaxed resize-none font-normal"
+            placeholder="Cinematic description of visual shot, setting, characters..."
           />
+
+          {/* Secondary Actions for Visuals */}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleEnhancePrompt}
+              disabled={enhanceLoading || regenLoading}
+              className="btn-secondary text-[11px] py-1 px-2.5 min-h-[32px] border border-[#292A29] disabled:opacity-40"
+              title="Enhance prompt with AI Director"
+            >
+              <Sparkles className={`w-3 h-3 text-[#E76536] ${enhanceLoading ? "animate-spin" : ""}`} />
+              <span>{enhanceLoading ? "Writing..." : "AI Prompt"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRegenerateImage}
+              disabled={regenLoading || enhanceLoading}
+              className={`text-[11px] py-1 px-3 rounded-md font-medium border transition-colors flex items-center gap-1.5 min-h-[32px] ${
+                regenSuccess
+                  ? "border-[#4FAE7B] text-[#4FAE7B] bg-[#4FAE7B]/10"
+                  : "border-[#292A29] bg-[#151616] text-[#A9A49B] hover:text-[#F5F1E8] hover:border-[#383938]"
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <RefreshCw className={`w-3 h-3 ${regenLoading ? "animate-spin" : ""}`} />
+              <span>{regenSuccess ? "Generated!" : regenLoading ? "Generating..." : "Regenerate Visual"}</span>
+            </button>
+          </div>
         </div>
 
-        {/* ─────────────── ANIMATION + DURATION ────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* ─────────────── 4. ANIMATION & DURATION ───────────────────────── */}
+        <div className="grid grid-cols-2 gap-3 pt-1">
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-400 uppercase mb-1">Animation</label>
+            <label className="block text-xs font-semibold text-[#A9A49B] uppercase tracking-wider mb-1">
+              ANIMATION
+            </label>
             <select
               value={animationStyle}
               onChange={(e) => setAnimationStyle(e.target.value)}
-              className="input-base text-xs py-1.5"
+              className="input-base text-xs py-2"
             >
               {ANIMATION_STYLES.map((s) => (
                 <option key={s} value={s}>
@@ -380,7 +312,9 @@ export default function SceneEditor() {
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-400 uppercase mb-1">Duration (s)</label>
+            <label className="block text-xs font-semibold text-[#A9A49B] uppercase tracking-wider mb-1">
+              DURATION (S)
+            </label>
             <input
               type="number"
               step="0.5"
@@ -388,23 +322,23 @@ export default function SceneEditor() {
               max="15"
               value={duration}
               onChange={(e) => setDuration(parseFloat(e.target.value))}
-              className="input-base text-xs py-1.5"
+              className="input-base text-xs py-2 font-mono"
             />
           </div>
         </div>
       </div>
 
-      {/* ── Save button ──────────────────────────────────────────────────────── */}
-      <div className="p-4 border-t border-[#24272E] bg-[#141517]">
+      {/* ── 5. ACTIONS (PRIMARY CTA) ─────────────────────────────────────────── */}
+      <div className="p-4 border-t border-[#292A29] bg-[#151616]">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="btn-primary w-full py-2.5 text-xs flex items-center justify-center gap-2 shadow-sm"
+          className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-2 shadow-sm"
         >
           {saving ? (
             <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving Changes...</>
           ) : (
-            <><Wand2 className="w-3.5 h-3.5" /> Apply Scene Changes</>
+            <><Wand2 className="w-3.5 h-3.5" /> APPLY CHANGES</>
           )}
         </button>
       </div>

@@ -285,17 +285,17 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
     : activeScene?.animation_style?.replace(/_/g, " ").toUpperCase() || "KEN BURNS";
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-2 sm:p-4 relative">
-      {/* ── Video Player Smartphone Container ───────────────────────────────── */}
-      <div className="relative w-full max-w-[280px] xs:max-w-[300px] sm:max-w-[320px] aspect-[9/16] rounded-2xl overflow-hidden border border-[#24272E] bg-black shadow-2xl flex flex-col justify-between group">
+    <div className="w-full flex flex-col items-center justify-center p-2 sm:p-4 relative select-none">
+      {/* ── Video Player 9:16 Stage Container ───────────────────────────────── */}
+      <div className="relative w-full max-w-[280px] xs:max-w-[300px] sm:max-w-[320px] aspect-[9/16] rounded-xl overflow-hidden border border-[#292A29] bg-black shadow-2xl flex flex-col justify-between group">
         {/* Background visual image */}
-        <div className="absolute inset-0 z-0 overflow-hidden bg-neutral-950">
+        <div className="absolute inset-0 z-0 overflow-hidden bg-black">
           {isImageLoading && !isSceneImageFailed && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/80 z-10 pointer-events-none">
-              <div className="w-8 h-8 rounded-lg bg-[#1B1D21] border border-[#24272E] flex items-center justify-center animate-pulse mb-1.5">
-                <Film className="w-4 h-4 text-[#E0693B]" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10 pointer-events-none">
+              <div className="w-8 h-8 rounded-md bg-[#1B1C1C] border border-[#292A29] flex items-center justify-center animate-pulse mb-1.5">
+                <Film className="w-4 h-4 text-[#E76536]" />
               </div>
-              <span className="text-[10px] text-neutral-400">Loading scene...</span>
+              <span className="text-[10px] text-[#77746E]">Loading visual...</span>
             </div>
           )}
 
@@ -315,23 +315,23 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
                   }
                 }}
                 alt="Scene Visual"
-                initial={{ scale: 1.0, opacity: 0.8 }}
-                animate={{ scale: isPlaying ? 1.15 : 1.04, opacity: 1 }}
+                initial={{ scale: 1.0, opacity: 0.85 }}
+                animate={{ scale: isPlaying ? 1.12 : 1.02, opacity: 1 }}
                 transition={{
                   scale: { duration: isPlaying ? 8 : 0.4, ease: "linear" },
-                  opacity: { duration: 0.3 },
+                  opacity: { duration: 0.25 },
                 }}
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-neutral-900 to-black text-center relative">
-                <div className="w-12 h-12 rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-center mb-2">
-                  <Film className="w-5 h-5 text-neutral-400" />
+              <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-[#151616] to-black text-center relative">
+                <div className="w-10 h-10 rounded-md bg-[#1B1C1C] border border-[#292A29] flex items-center justify-center mb-2">
+                  <Film className="w-5 h-5 text-[#77746E]" />
                 </div>
-                <span className="text-[11px] font-semibold text-neutral-300 uppercase tracking-wider mb-1">
+                <span className="text-[10px] font-mono text-[#A9A49B] uppercase tracking-wider mb-1">
                   Scene #{activeScene?.scene_number ?? 1}
                 </span>
-                <p className="text-[11px] text-neutral-400 line-clamp-3 italic px-2">
+                <p className="text-[11px] text-[#77746E] line-clamp-3 italic px-2">
                   &ldquo;{activeScene?.narration || activeScene?.subtitle || "Narrative scene"}&rdquo;
                 </p>
               </div>
@@ -339,13 +339,13 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
           </AnimatePresence>
 
           {/* Vignette Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/85 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/80 pointer-events-none" />
         </div>
 
         {/* Top Badges */}
         <div className="relative z-10 p-2.5 flex items-center justify-between">
-          <span className="px-2 py-0.5 rounded bg-black/75 backdrop-blur text-[10px] font-bold text-white border border-white/10 flex items-center gap-1">
-            <Film className="w-3 h-3 text-[#E0693B]" />
+          <span className="px-2 py-0.5 rounded bg-black/80 text-[10px] font-bold text-[#F5F1E8] border border-white/10 font-mono flex items-center gap-1">
+            <Film className="w-3 h-3 text-[#E76536]" />
             #{activeScene?.scene_number ?? 1}
           </span>
           <span className="camera-badge">
@@ -363,11 +363,11 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
           </div>
         )}
 
-        {/* Center Hover Play Button */}
+        {/* Center Play Button Overlay */}
         <div className="relative z-10 flex-1 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <button
             onClick={togglePlay}
-            className="w-12 h-12 rounded-full bg-[#E0693B] hover:bg-[#EB794D] text-white flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-transform"
+            className="w-11 h-11 rounded-full bg-[#E76536] hover:bg-[#F07847] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? (
@@ -382,12 +382,12 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
         <div className="relative z-10 space-y-1">
           {renderSubtitle()}
 
-          <div className="px-3 pb-2 flex items-center justify-between text-[10px] text-neutral-400">
-            <div className="flex items-center gap-1.5">
+          <div className="px-3 pb-2 flex items-center justify-between text-[10px] text-[#77746E]">
+            <div className="flex items-center gap-1.5 font-mono">
               <Mic2
-                className={`w-3 h-3 ${isPlaying ? "text-[#E0693B] voice-active-pulse" : "text-neutral-500"}`}
+                className={`w-3 h-3 ${isPlaying ? "text-[#E76536] voice-active-pulse" : "text-[#77746E]"}`}
               />
-              <span className={isPlaying ? "text-white font-medium" : "text-neutral-400"}>
+              <span className={isPlaying ? "text-[#F5F1E8] font-medium" : "text-[#77746E]"}>
                 {voiceLang === "hi" ? "Hindi" : "Indian English"} · {voiceGender}
               </span>
             </div>
@@ -395,7 +395,7 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
               {[30, 65, 95, 50, 80, 40, 60].map((h, i) => (
                 <div
                   key={i}
-                  className="w-0.5 rounded-full bg-[#E0693B] transition-all duration-150"
+                  className="w-0.5 rounded-full bg-[#E76536] transition-all duration-150"
                   style={{
                     height: isPlaying ? `${((h * (i + 1)) % 12) + 4}px` : "3px",
                     opacity: isPlaying ? 0.9 : 0.25,
@@ -408,27 +408,27 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
       </div>
 
       {/* Playback Control Below Player */}
-      <div className="mt-3 flex items-center gap-3 select-none">
+      <div className="mt-3 flex items-center gap-2.5 select-none">
         <button
           onClick={togglePlay}
           className="btn-secondary text-xs px-3.5 py-1.5 min-h-[36px] flex items-center gap-2"
         >
           {isPlaying ? (
             <>
-              <Pause className="w-3.5 h-3.5 text-[#E0693B]" />
+              <Pause className="w-3.5 h-3.5 text-[#E76536]" />
               <span>Pause</span>
             </>
           ) : (
             <>
-              <Play className="w-3.5 h-3.5 text-[#E0693B] fill-[#E0693B]" />
-              <span>Play Video</span>
+              <Play className="w-3.5 h-3.5 text-[#E76536] fill-[#E76536]" />
+              <span>Play Preview</span>
             </>
           )}
         </button>
 
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#141517] border border-[#24272E] text-[10px] text-neutral-300 font-medium">
-          <span className="text-[#E0693B] font-semibold">📱 9:16</span>
-          <span className="text-neutral-400">Vertical Shorts</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#151616] border border-[#292A29] text-[10px] text-[#A9A49B] font-mono">
+          <span className="text-[#E76536] font-semibold">9:16</span>
+          <span>1080×1920</span>
         </div>
       </div>
     </div>

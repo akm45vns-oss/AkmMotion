@@ -57,22 +57,22 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-2xl bg-[#141517] border border-[#24272E] shadow-2xl relative space-y-4">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-xl bg-[#151616] border border-[#292A29] shadow-2xl relative space-y-4">
         {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-[#24272E] pb-3">
+        <div className="flex items-center justify-between border-b border-[#292A29] pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-[#1B1D21] border border-[#24272E] text-[#E0693B]">
+            <div className="p-2 rounded-lg bg-[#1B1C1C] border border-[#292A29] text-[#E76536]">
               <UserCheck className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-[#F2F2F3]">Create Character Profile</h2>
-              <p className="text-[11px] text-neutral-400">Lock persistent visual identity for video scenes</p>
+              <h2 className="text-sm font-bold text-[#F5F1E8] font-display">Create Character Profile</h2>
+              <p className="text-[11px] text-[#A9A49B]">Lock persistent visual identity for video scenes</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-[#1B1D21] transition-colors"
+            className="p-1.5 rounded-md text-[#A9A49B] hover:text-[#F5F1E8] hover:bg-[#1B1C1C] transition-colors"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -80,7 +80,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg bg-[#E55353]/10 border border-[#E55353]/25 text-[#E55353] text-xs">
+          <div className="p-3 rounded-lg bg-[#C95C5C]/10 border border-[#C95C5C]/25 text-[#C95C5C] text-xs">
             {error}
           </div>
         )}
@@ -88,7 +88,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Character Name</label>
+              <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Character Name</label>
               <input
                 type="text"
                 required
@@ -99,7 +99,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Story Role</label>
+              <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Story Role</label>
               <input
                 type="text"
                 value={role}
@@ -112,7 +112,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
 
           <div className="grid grid-cols-3 gap-2.5">
             <div>
-              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Age</label>
+              <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Age</label>
               <input
                 type="number"
                 value={age}
@@ -121,7 +121,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Gender</label>
+              <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Gender</label>
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
@@ -133,7 +133,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Skin Tone</label>
+              <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Skin Tone</label>
               <input
                 type="text"
                 value={skinTone}
@@ -145,7 +145,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Hair Style & Color</label>
+            <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Hair Style & Color</label>
             <input
               type="text"
               value={hairColor}
@@ -156,7 +156,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Locked Outfit</label>
+            <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Locked Outfit</label>
             <input
               type="text"
               value={outfit}
@@ -167,7 +167,7 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-neutral-300 uppercase mb-1">Visual Render Style</label>
+            <label className="block text-[11px] font-semibold text-[#A9A49B] uppercase mb-1">Visual Render Style</label>
             <input
               type="text"
               value={visualStyle}
@@ -177,11 +177,11 @@ export default function CreateCharacterModal({ onClose, onCreated }: CreateChara
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#24272E]">
-            <button type="button" onClick={onClose} className="btn-secondary text-xs">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#292A29]">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs touch-target">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="btn-primary text-xs shadow-sm">
+            <button type="submit" disabled={loading} className="btn-primary text-xs shadow-sm touch-target">
               {loading ? "Creating..." : "Save Character DNA"}
             </button>
           </div>

@@ -18,7 +18,7 @@ export default function MobileNav() {
   return (
     <nav
       aria-label="Mobile Bottom Navigation"
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#141517]/95 backdrop-blur-md border-t border-[#24272E] px-2 py-1 safe-bottom shadow-2xl"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#151616]/98 backdrop-blur-md border-t border-[#292A29] px-2 py-1 safe-bottom shadow-2xl"
     >
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {navItems.map((item) => {
@@ -30,13 +30,13 @@ export default function MobileNav() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="flex flex-col items-center justify-center -mt-4 touch-target group"
+                className="flex flex-col items-center justify-center -mt-3.5 touch-target group"
                 aria-label="Create New Video Project"
               >
-                <div className="w-12 h-12 rounded-2xl bg-[#E0693B] hover:bg-[#EB794D] text-white flex items-center justify-center shadow-lg shadow-[#E0693B]/25 transition-transform active:scale-95">
-                  <Icon className="w-6 h-6 stroke-[2.5]" />
+                <div className="w-11 h-11 rounded-xl bg-[#E76536] hover:bg-[#F07847] text-white flex items-center justify-center shadow-md shadow-[#E76536]/25 transition-transform active:scale-95">
+                  <Icon className="w-5 h-5 stroke-[2.5]" />
                 </div>
-                <span className="text-[10px] font-semibold text-neutral-300 mt-1">Create</span>
+                <span className="text-[10px] font-semibold text-[#A9A49B] mt-1">Create</span>
               </Link>
             );
           }
@@ -45,13 +45,13 @@ export default function MobileNav() {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex flex-col items-center justify-center py-1.5 px-3 min-h-[48px] rounded-xl transition-colors ${
+              className={`flex flex-col items-center justify-center py-1.5 px-3 min-h-[48px] rounded-lg transition-colors ${
                 isActive
-                  ? "text-[#E0693B] font-semibold"
-                  : "text-neutral-400 hover:text-neutral-200"
+                  ? "text-[#E76536] font-semibold"
+                  : "text-[#77746E] hover:text-[#F5F1E8]"
               }`}
             >
-              <Icon className="w-5 h-5 mb-0.5" />
+              <Icon className="w-4 h-4 mb-0.5" />
               <span className="text-[10px]">{item.label}</span>
             </Link>
           );

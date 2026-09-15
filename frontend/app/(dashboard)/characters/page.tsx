@@ -53,12 +53,12 @@ export default function CharacterStudioPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* Top Studio Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#24272E] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#292A29] pb-5">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#F2F2F3] tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#F5F1E8] tracking-tight font-display">
             Character Memory Studio (CME)
           </h1>
-          <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+          <p className="text-xs sm:text-sm text-[#A9A49B] mt-1">
             Lock persistent visual identity across all scenes to ensure consistent faces, hairstyles, and outfits.
           </p>
         </div>
@@ -66,7 +66,7 @@ export default function CharacterStudioPage() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={fetchCharacters}
-            className="p-2.5 rounded-xl bg-[#141517] border border-[#24272E] text-neutral-400 hover:text-white transition-colors"
+            className="p-2.5 rounded-lg bg-[#151616] border border-[#292A29] text-[#A9A49B] hover:text-[#F5F1E8] hover:bg-[#1B1C1C] transition-colors touch-target"
             title="Refresh Characters"
             aria-label="Refresh Characters"
           >
@@ -85,40 +85,40 @@ export default function CharacterStudioPage() {
 
       {/* CME Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="p-4 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#1B1D21] border border-[#24272E] text-neutral-300 flex items-center justify-center">
+        <div className="p-4 rounded-lg bg-[#151616] border border-[#292A29] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-md bg-[#1B1C1C] border border-[#292A29] text-[#A9A49B] flex items-center justify-center">
             <UserCheck className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Total Characters</div>
-            <div className="text-lg font-bold text-[#F2F2F3]">{characters.length}</div>
+            <div className="text-[10px] text-[#77746E] uppercase font-semibold font-mono">Total Characters</div>
+            <div className="text-lg font-bold text-[#F5F1E8] font-mono">{characters.length}</div>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#E0693B]/10 border border-[#E0693B]/25 text-[#E0693B] flex items-center justify-center">
+        <div className="p-4 rounded-lg bg-[#151616] border border-[#292A29] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-md bg-[#E76536]/10 border border-[#E76536]/25 text-[#E76536] flex items-center justify-center">
             <Lock className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Locked DNA</div>
-            <div className="text-lg font-bold text-[#E0693B]">{lockedCount} Locked</div>
+            <div className="text-[10px] text-[#77746E] uppercase font-semibold font-mono">Locked DNA</div>
+            <div className="text-lg font-bold text-[#E76536] font-mono">{lockedCount} Locked</div>
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-[#141517] border border-[#24272E] flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#2EB88A]/10 border border-[#2EB88A]/25 text-[#2EB88A] flex items-center justify-center">
+        <div className="p-4 rounded-lg bg-[#151616] border border-[#292A29] flex items-center gap-3">
+          <div className="w-9 h-9 rounded-md bg-[#4FAE7B]/10 border border-[#4FAE7B]/25 text-[#4FAE7B] flex items-center justify-center">
             <ShieldCheck className="w-4 h-4" />
           </div>
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase font-semibold">Consistency Score</div>
-            <div className="text-lg font-bold text-[#2EB88A]">95% Match</div>
+            <div className="text-[10px] text-[#77746E] uppercase font-semibold font-mono">Consistency Score</div>
+            <div className="text-lg font-bold text-[#4FAE7B] font-mono">95% Match</div>
           </div>
         </div>
       </div>
 
       {/* Search Input */}
       <div className="relative">
-        <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3" />
+        <Search className="w-4 h-4 text-[#77746E] absolute left-3.5 top-3" />
         <input
           type="text"
           value={search}
@@ -132,22 +132,22 @@ export default function CharacterStudioPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-44 rounded-xl bg-[#141517] border border-[#24272E] animate-pulse" />
+            <div key={i} className="h-44 rounded-lg bg-[#151616] border border-[#292A29] animate-pulse" />
           ))}
         </div>
       ) : characters.length === 0 ? (
-        <div className="p-10 rounded-xl border border-dashed border-[#24272E] bg-[#141517]/40 text-center space-y-3">
-          <div className="w-12 h-12 rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-center mx-auto text-neutral-400">
+        <div className="p-10 rounded-lg border border-dashed border-[#292A29] bg-[#151616]/40 text-center space-y-3">
+          <div className="w-12 h-12 rounded-lg bg-[#1B1C1C] border border-[#292A29] flex items-center justify-center mx-auto text-[#A9A49B]">
             <UserCheck className="w-5 h-5" />
           </div>
-          <h3 className="text-sm font-semibold text-[#F2F2F3]">No characters found</h3>
-          <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+          <h3 className="text-sm font-semibold text-[#F5F1E8]">No characters found</h3>
+          <p className="text-xs text-[#A9A49B] max-w-sm mx-auto">
             Characters are automatically detected from script prompts or created manually for persistent identity locking.
           </p>
           <div className="pt-2">
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="btn-primary text-xs"
+              className="btn-primary text-xs touch-target inline-flex items-center gap-2"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create Character</span>

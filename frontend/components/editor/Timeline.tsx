@@ -31,15 +31,15 @@ export default function Timeline() {
   };
 
   return (
-    <div className="h-40 border-t border-[#24272E] bg-[#141517] flex flex-col justify-between p-3 sm:p-4 select-none">
+    <div className="h-40 border-t border-[#292A29] bg-[#151616] flex flex-col justify-between p-3 sm:p-4 select-none">
       {/* Track Header */}
-      <div className="flex items-center justify-between text-xs text-neutral-400 mb-1.5">
-        <div className="flex items-center gap-2 font-semibold text-[#F2F2F3]">
-          <Layers className="w-3.5 h-3.5 text-[#E0693B]" />
+      <div className="flex items-center justify-between text-xs text-[#A9A49B] mb-1.5">
+        <div className="flex items-center gap-2 font-semibold text-[#F5F1E8]">
+          <Layers className="w-3.5 h-3.5 text-[#E76536]" />
           <span>Timeline Tracks ({scenes.length} Scenes)</span>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px] font-mono text-neutral-400">
-          <Clock className="w-3 h-3 text-[#E0693B]" />
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#77746E]">
+          <Clock className="w-3 h-3 text-[#E76536]" />
           <span>Total: {totalDuration.toFixed(1)}s</span>
         </div>
       </div>
@@ -59,10 +59,10 @@ export default function Timeline() {
             <div
               key={scene.id || index}
               onClick={handleSelect}
-              className={`flex-shrink-0 w-32 sm:w-36 h-24 rounded-lg border cursor-pointer relative overflow-hidden transition-all group ${
+              className={`flex-shrink-0 w-32 sm:w-36 h-24 rounded-md border cursor-pointer relative overflow-hidden transition-all group ${
                 isActive
-                  ? "border-[#E0693B] ring-1 ring-[#E0693B] shadow-md shadow-[#E0693B]/20 scale-[1.02]"
-                  : "border-[#24272E] hover:border-[#333742] bg-[#0C0D0E]"
+                  ? "border-[#E76536] ring-1 ring-[#E76536] shadow-md shadow-[#E76536]/15 scale-[1.02]"
+                  : "border-[#292A29] hover:border-[#383938] bg-[#0D0E0E]"
               }`}
             >
               {/* Background Scene Image */}
@@ -76,20 +76,20 @@ export default function Timeline() {
                 }}
                 className="w-full h-full object-cover opacity-75 group-hover:opacity-90 transition-opacity"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/60" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60" />
 
               {/* Scene Number Badge */}
-              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-white border border-white/10 font-mono">
+              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/85 text-[10px] font-bold text-[#F5F1E8] border border-white/10 font-mono">
                 #{scene.scene_number}
               </div>
 
               {/* Duration Badge */}
-              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#141517]/90 text-[10px] font-medium text-neutral-300 border border-[#24272E] font-mono">
+              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#151616]/90 text-[10px] font-medium text-[#A9A49B] border border-[#292A29] font-mono">
                 {scene.duration || 5}s
               </div>
 
               {/* Narration Preview */}
-              <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-neutral-200 line-clamp-1 font-medium">
+              <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-[#F5F1E8]/90 line-clamp-1 font-medium">
                 {(scene.narration || "").replace(/\*\*/g, "")}
               </div>
             </div>

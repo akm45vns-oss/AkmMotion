@@ -88,17 +88,17 @@ export default function EditorPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#0C0D0E]">
+      <div className="h-screen w-full flex items-center justify-center bg-[#0D0E0E]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-7 h-7 text-[#E0693B] animate-spin" />
-          <p className="text-xs font-medium text-neutral-400">Loading Video Studio...</p>
+          <Loader2 className="w-7 h-7 text-[#E76536] animate-spin" />
+          <p className="text-xs font-medium text-[#A9A49B]">Loading Video Studio...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-[#0C0D0E] text-[#F2F2F3] overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-[#0D0E0E] text-[#F5F1E8] overflow-hidden">
       {/* Top Studio Toolbar */}
       <ToolBar
         onRenderClick={() => setIsRenderModalOpen(true)}
@@ -107,13 +107,13 @@ export default function EditorPage() {
       />
 
       {/* Mobile Workspace Mode Switcher (Visible only on < lg screens) */}
-      <div className="lg:hidden border-b border-[#24272E] bg-[#141517] px-3 py-1.5 flex items-center justify-around text-xs select-none">
+      <div className="lg:hidden border-b border-[#292A29] bg-[#151616] px-3 py-2 flex items-center justify-around text-xs select-none">
         <button
           onClick={() => setMobileTab("preview")}
-          className={`flex items-center gap-1.5 py-1 px-3 rounded-lg font-medium transition-colors ${
+          className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-md font-medium transition-colors touch-target ${
             mobileTab === "preview"
-              ? "bg-[#1B1D21] text-[#E0693B] font-semibold border border-[#333742]"
-              : "text-neutral-400 hover:text-white"
+              ? "bg-[#1B1C1C] text-[#E76536] font-semibold border border-[#383938]"
+              : "text-[#A9A49B] hover:text-[#F5F1E8]"
           }`}
         >
           <Film className="w-3.5 h-3.5" />
@@ -122,10 +122,10 @@ export default function EditorPage() {
 
         <button
           onClick={() => setMobileTab("inspector")}
-          className={`flex items-center gap-1.5 py-1 px-3 rounded-lg font-medium transition-colors ${
+          className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-md font-medium transition-colors touch-target ${
             mobileTab === "inspector"
-              ? "bg-[#1B1D21] text-[#E0693B] font-semibold border border-[#333742]"
-              : "text-neutral-400 hover:text-white"
+              ? "bg-[#1B1C1C] text-[#E76536] font-semibold border border-[#383938]"
+              : "text-[#A9A49B] hover:text-[#F5F1E8]"
           }`}
         >
           <Sliders className="w-3.5 h-3.5" />
@@ -134,10 +134,10 @@ export default function EditorPage() {
 
         <button
           onClick={() => setMobileTab("timeline")}
-          className={`flex items-center gap-1.5 py-1 px-3 rounded-lg font-medium transition-colors ${
+          className={`flex items-center gap-1.5 py-1.5 px-3.5 rounded-md font-medium transition-colors touch-target ${
             mobileTab === "timeline"
-              ? "bg-[#1B1D21] text-[#E0693B] font-semibold border border-[#333742]"
-              : "text-neutral-400 hover:text-white"
+              ? "bg-[#1B1C1C] text-[#E76536] font-semibold border border-[#383938]"
+              : "text-[#A9A49B] hover:text-[#F5F1E8]"
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
@@ -149,30 +149,30 @@ export default function EditorPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Center Video Preview Viewport */}
         <div
-          className={`flex-1 border-r border-[#24272E] p-2 sm:p-4 flex flex-col justify-center items-center overflow-y-auto ${
+          className={`flex-1 border-r border-[#292A29] p-2 sm:p-4 flex flex-col justify-center items-center overflow-y-auto ${
             mobileTab !== "preview" ? "hidden lg:flex" : "flex"
           }`}
         >
           {isGenerating ? (
-            <div className="w-full max-w-sm p-6 rounded-xl bg-[#141517] border border-[#24272E] text-center space-y-3 shadow-xl">
-              <div className="w-12 h-12 mx-auto rounded-xl bg-[#E0693B]/10 border border-[#E0693B]/25 flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-[#E0693B] animate-spin" />
+            <div className="w-full max-w-sm p-6 rounded-xl bg-[#151616] border border-[#292A29] text-center space-y-3 shadow-xl">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-[#E76536]/10 border border-[#E76536]/25 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-[#E76536] animate-spin" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-[#F2F2F3]">AI Director at Work</h3>
-                <p className="text-xs text-neutral-400 leading-relaxed">
+                <h3 className="text-sm font-bold text-[#F5F1E8] font-display">AI Director at Work</h3>
+                <p className="text-xs text-[#A9A49B] leading-relaxed">
                   Splitting script into vertical scenes, synthesizing Indian voiceover, and preparing visual assets...
                 </p>
               </div>
             </div>
           ) : scenes.length === 0 ? (
-            <div className="w-full max-w-sm p-6 rounded-xl bg-[#141517] border border-[#24272E] text-center space-y-4 shadow-xl">
-              <div className="w-12 h-12 mx-auto rounded-xl bg-[#1B1D21] border border-[#24272E] flex items-center justify-center text-neutral-400">
+            <div className="w-full max-w-sm p-6 rounded-xl bg-[#151616] border border-[#292A29] text-center space-y-4 shadow-xl">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-[#1B1C1C] border border-[#292A29] flex items-center justify-center text-[#A9A49B]">
                 <Film className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-[#F2F2F3]">No Scenes Generated Yet</h3>
-                <p className="text-xs text-neutral-400 leading-relaxed">
+                <h3 className="text-sm font-bold text-[#F5F1E8] font-display">No Scenes Generated Yet</h3>
+                <p className="text-xs text-[#A9A49B] leading-relaxed">
                   Your script is saved. Click below to generate 9:16 vertical scenes and audio narration.
                 </p>
               </div>

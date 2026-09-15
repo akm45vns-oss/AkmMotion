@@ -6,25 +6,25 @@
 
 /* ─── CSS Custom Properties (Design System Tokens) ────────────────────────── */
 :root {
-  --bg-canvas:           #0C0D0E;
-  --bg-surface:          #141517;
-  --bg-surface-elevated: #1B1D21;
-  --bg-surface-active:   #23262C;
-  --border-subtle:       #24272E;
-  --border-strong:       #333742;
-  --text-primary:        #F2F2F3;
-  --text-secondary:      #9FA3AD;
-  --text-muted:          #646875;
-  --accent-primary:      #E0693B;
-  --accent-hover:        #EB794D;
-  --accent-subtle:       rgba(224, 105, 59, 0.12);
-  --accent-border:       rgba(224, 105, 59, 0.28);
-  --success:             #2EB88A;
-  --warning:             #E5A43B;
-  --error:               #E55353;
+  --bg-canvas:           #0D0E0E;
+  --bg-surface:          #151616;
+  --bg-surface-elevated: #1B1C1C;
+  --bg-surface-active:   #232424;
+  --border-subtle:       #292A29;
+  --border-strong:       #383938;
+  --text-primary:        #F5F1E8;
+  --text-secondary:      #A9A49B;
+  --text-muted:          #77746E;
+  --accent-primary:      #E76536;
+  --accent-hover:        #F07847;
+  --accent-subtle:       rgba(231, 101, 54, 0.12);
+  --accent-border:       rgba(231, 101, 54, 0.28);
+  --success:             #4FAE7B;
+  --warning:             #C99545;
+  --error:               #C95C5C;
   --radius-sm:           6px;
-  --radius-md:           10px;
-  --radius-lg:           14px;
+  --radius-md:           8px;
+  --radius-lg:           10px;
 }
 
 /* ─── Base Styles ─────────────────────────────────────────────────────────── */
@@ -65,19 +65,19 @@ code, kbd, samp, pre {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background-color: #E0693B;
+  background-color: #E76536;
   color: #FFFFFF;
   font-weight: 600;
   font-size: 0.8125rem;
   padding: 0.625rem 1.25rem;
   border-radius: var(--radius-md);
   transition: all 0.15s ease-in-out;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   min-height: 40px;
 }
 
 .btn-primary:hover {
-  background-color: #EB794D;
+  background-color: #F07847;
 }
 
 .btn-primary:active {
@@ -139,7 +139,7 @@ code, kbd, samp, pre {
   color: var(--text-primary);
   font-size: 0.875rem;
   padding: 0.625rem 0.875rem;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input-base::placeholder {
@@ -162,9 +162,9 @@ code, kbd, samp, pre {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  background-color: rgba(229, 164, 59, 0.1);
-  border: 1px solid rgba(229, 164, 59, 0.25);
-  color: #F6C065;
+  background-color: rgba(201, 149, 69, 0.12);
+  border: 1px solid rgba(201, 149, 69, 0.3);
+  color: #E5B262;
 }
 
 .cme-badge {
@@ -175,9 +175,9 @@ code, kbd, samp, pre {
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
-  background-color: rgba(46, 184, 138, 0.1);
-  border: 1px solid rgba(46, 184, 138, 0.25);
-  color: #34D399;
+  background-color: rgba(79, 174, 123, 0.12);
+  border: 1px solid rgba(79, 174, 123, 0.3);
+  color: #5BC48D;
 }
 
 /* ─── Karaoke Subtitle Words ──────────────────────────────────────────────── */

@@ -134,7 +134,7 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto p-5 sm:p-6 rounded-2xl bg-[#141517] border border-[#24272E] shadow-2xl relative flex flex-col items-center">
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto p-5 sm:p-6 rounded-xl bg-[#151616] border border-[#292A29] shadow-2xl relative flex flex-col items-center">
         {/* Close Button */}
         <button
           onClick={() => {
@@ -142,7 +142,7 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
             cleanupPolling();
             onClose();
           }}
-          className="absolute top-3.5 right-3.5 z-10 p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-[#1B1D21] transition-colors"
+          className="absolute top-3.5 right-3.5 z-10 p-2 rounded-lg text-[#A9A49B] hover:text-[#F5F1E8] hover:bg-[#1B1C1C] transition-colors"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
@@ -150,16 +150,16 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
 
         {/* Modal Header */}
         <div className="text-center mb-3">
-          <h2 className="text-base font-bold text-[#F2F2F3] flex items-center justify-center gap-1.5">
+          <h2 className="text-base font-bold text-[#F5F1E8] flex items-center justify-center gap-1.5 font-display">
             <span>Video Export Studio</span>
           </h2>
-          <p className="text-[11px] text-neutral-400 mt-0.5">
+          <p className="text-[11px] text-[#A9A49B] mt-0.5">
             1080×1920 MP4 H.264 vertical video with burned-in subtitles
           </p>
         </div>
 
         {/* Smartphone Vertical Preview Frame */}
-        <div className="relative w-[200px] h-[355px] rounded-xl overflow-hidden border border-[#24272E] bg-black shadow-xl flex items-center justify-center my-2">
+        <div className="relative w-[200px] h-[355px] rounded-lg overflow-hidden border border-[#292A29] bg-black shadow-xl flex items-center justify-center my-2">
           {phase === "done" && downloadUrl ? (
             <video
               src={downloadUrl}
@@ -167,10 +167,10 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
               autoPlay
               loop
               playsInline
-              className="w-full h-full object-cover rounded-xl"
+              className="w-full h-full object-cover rounded-lg"
             />
           ) : phase === "rendering" ? (
-            <div className="relative w-full h-full flex flex-col items-center justify-center bg-neutral-950 p-4 text-center">
+            <div className="relative w-full h-full flex flex-col items-center justify-center bg-black p-4 text-center">
               {firstSceneImg ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -180,22 +180,22 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
                 />
               ) : null}
               <div className="relative z-10 flex flex-col items-center gap-2.5">
-                <div className="p-3 rounded-xl bg-[#E0693B]/10 border border-[#E0693B]/25">
-                  <Loader2 className="w-6 h-6 text-[#E0693B] animate-spin" />
+                <div className="p-3 rounded-lg bg-[#E76536]/10 border border-[#E76536]/25">
+                  <Loader2 className="w-6 h-6 text-[#E76536] animate-spin" />
                 </div>
                 <div className="space-y-0.5">
-                  <span className="text-xs font-semibold text-[#F2F2F3]">Encoding MP4</span>
-                  <p className="text-[10px] text-neutral-400 font-mono">
+                  <span className="text-xs font-semibold text-[#F5F1E8]">Encoding MP4</span>
+                  <p className="text-[10px] text-[#A9A49B] font-mono">
                     {scenes.length} Scenes · 30 FPS
                   </p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-2 p-4 text-center">
-              <AlertCircle className="w-8 h-8 text-[#E55353]" />
-              <p className="text-white font-bold text-xs">Render Failed</p>
-              <p className="text-[#E55353] text-[10px] line-clamp-3">{errorMsg}</p>
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-2 p-4 text-center">
+              <AlertCircle className="w-8 h-8 text-[#C95C5C]" />
+              <p className="text-[#F5F1E8] font-bold text-xs">Render Failed</p>
+              <p className="text-[#C95C5C] text-[10px] line-clamp-3">{errorMsg}</p>
             </div>
           )}
         </div>
@@ -205,12 +205,12 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
           {phase === "rendering" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-neutral-400">{statusText}</span>
-                <span className="text-[#E0693B] font-mono font-semibold">{progress}%</span>
+                <span className="text-[#A9A49B]">{statusText}</span>
+                <span className="text-[#E76536] font-mono font-semibold">{progress}%</span>
               </div>
-              <div className="w-full h-1.5 rounded-full bg-[#1B1D21] overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-[#1B1C1C] border border-[#292A29] overflow-hidden">
                 <div
-                  className="h-full bg-[#E0693B] transition-all duration-300"
+                  className="h-full bg-[#E76536] transition-all duration-300"
                   style={{ width: `${Math.max(progress, 5)}%` }}
                 />
               </div>
@@ -219,7 +219,7 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
 
           {phase === "done" && (
             <div className="space-y-2">
-              <div className="flex items-center justify-center gap-1.5 text-[#2EB88A] text-xs font-semibold">
+              <div className="flex items-center justify-center gap-1.5 text-[#4FAE7B] text-xs font-semibold">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Ready for Download</span>
               </div>
