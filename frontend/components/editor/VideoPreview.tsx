@@ -64,14 +64,20 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
     return `https://image.pollinations.ai/prompt/${encoded}?width=768&height=1344&model=flux-realism&nologo=true&seed=${seed}`;
   };
 
+  const getSceneVideoUrl = (scene: any): string => {
+    const videoAsset = scene?.assets?.find((a: any) => a.asset_type === "video");
+    return videoAsset?.url || "";
+  };
+
   const sceneKey = activeScene?.id || String(activeScene?.scene_number || 1);
   const baseImageUrl = activeScene ? getSceneImageUrl(activeScene) : "";
   const currentImageUrl = imgSrcOverrides[sceneKey] || baseImageUrl;
+  const currentVideoUrl = activeScene ? getSceneVideoUrl(activeScene) : "";
   const isSceneImageFailed = Boolean(failedScenes[sceneKey]);
 
   useEffect(() => {
     setIsImageLoading(true);
-  }, [currentImageUrl]);
+  }, [currentImageUrl, currentVideoUrl]);
 
   // ── Voice & Karaoke engine ────────────────────────────────────────────────
   const pickVoice = useCallback((lang: string, gender: string): SpeechSynthesisVoice | null => {
@@ -300,7 +306,18 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
           )}
 
           <AnimatePresence mode="wait">
-            {!isSceneImageFailed && currentImageUrl ? (
+            {currentVideoUrl ? (
+              <video
+                key={currentVideoUrl}
+                src={currentVideoUrl}
+                autoPlay={isPlaying}
+                loop
+                muted
+                playsInline
+                onLoadedData={() => setIsImageLoading(false)}
+                className="w-full h-full object-cover"
+              />
+            ) : !isSceneImageFailed && currentImageUrl ? (
               <motion.img
                 key={currentImageUrl}
                 src={currentImageUrl}
@@ -344,10 +361,17 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
 
         {/* Top Badges */}
         <div className="relative z-10 p-2.5 flex items-center justify-between">
-          <span className="px-2 py-0.5 rounded bg-black/80 text-[10px] font-bold text-[#F5F1E8] border border-white/10 font-mono flex items-center gap-1">
-            <Film className="w-3 h-3 text-[#E76536]" />
-            #{activeScene?.scene_number ?? 1}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="px-2 py-0.5 rounded bg-black/80 text-[10px] font-bold text-[#F5F1E8] border border-white/10 font-mono flex items-center gap-1">
+              <Film className="w-3 h-3 text-[#E76536]" />
+              #{activeScene?.scene_number ?? 1}
+            </span>
+            {currentVideoUrl && (
+              <span className="px-1.5 py-0.5 rounded bg-[#4FAE7B]/20 text-[9px] font-bold text-[#4FAE7B] border border-[#4FAE7B]/30 font-mono">
+                FAL.AI VIDEO
+              </span>
+            )}
+          </div>
           <span className="camera-badge">
             {cameraLabel}
           </span>

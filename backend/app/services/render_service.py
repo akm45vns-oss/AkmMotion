@@ -101,6 +101,10 @@ class RenderService:
                     img_asset = next((a for a in s.assets if a.asset_type == AssetType.image), None)
                     image_url = img_asset.url if img_asset else ""
 
+                    # Find video clip asset (e.g. fal.ai generated video)
+                    vid_asset = next((a for a in s.assets if a.asset_type == AssetType.video), None)
+                    video_url = vid_asset.url if vid_asset else ""
+
                     # Find audio asset
                     audio_asset = next((a for a in s.assets if a.asset_type == AssetType.audio), None)
                     audio_url = audio_asset.url if audio_asset else ""
@@ -112,6 +116,7 @@ class RenderService:
                         "scene_number": s.scene_number,
                         "duration": dur,
                         "image_url": image_url,
+                        "video_url": video_url,
                         "audio_url": audio_url,
                         "narration": s.narration or "",
                         "subtitle": s.subtitle or s.narration or "",

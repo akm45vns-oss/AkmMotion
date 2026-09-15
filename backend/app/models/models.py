@@ -101,6 +101,13 @@ class ExportFormat(str, enum.Enum):
     mp4 = "mp4"
     webm = "webm"
 
+class VideoGenerationStatus(str, enum.Enum):
+    pending = "pending"
+    in_queue = "in_queue"
+    in_progress = "in_progress"
+    completed = "completed"
+    failed = "failed"
+
 
 # Helper function to generate enum Column definitions with PostgreSQL type mapping
 def pg_enum(enum_cls, name: str, default=None):
@@ -184,6 +191,7 @@ class Scene(Base):
     project = relationship("Project", back_populates="scenes")
     script = relationship("Script", back_populates="scenes")
     assets = relationship("SceneAsset", back_populates="scene", cascade="all, delete-orphan")
+    video_jobs = relationship("VideoGenerationJob", back_populates="scene", cascade="all, delete-orphan")
 
 
 # 5. SceneAsset
@@ -197,6 +205,28 @@ class SceneAsset(Base):
     metadata_json = Column("metadata", JSONB, nullable=True)
 
     scene = relationship("Scene", back_populates="assets")
+
+
+# 6. VideoGenerationJob
+class VideoGenerationJob(Base):
+    __tablename__ = "video_generation_jobs"
+    __table_args__ = {'extend_existing': True}
+
+    scene_id = Column(UUID(as_uuid=True), ForeignKey("scenes.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(50), nullable=False, default="fal.ai")
+    provider_request_id = Column(String(255), nullable=True, index=True)
+    status_url = Column(Text, nullable=True)
+    response_url = Column(Text, nullable=True)
+    status = Column(String(50), nullable=False, default=VideoGenerationStatus.pending.value)
+    prompt = Column(Text, nullable=False)
+    video_url = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    scene = relationship("Scene", back_populates="video_jobs")
+    project = relationship("Project")
+    user = relationship("User")
 
 
 

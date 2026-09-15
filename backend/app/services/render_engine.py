@@ -135,12 +135,19 @@ class RenderEngineService:
                     )
 
                 img_path = os.path.join(tmp_dir, f"scene_{idx}_img.jpg")
+                vid_path = os.path.join(tmp_dir, f"scene_{idx}_vid.mp4")
                 audio_path = os.path.join(tmp_dir, f"scene_{idx}_audio.mp3")
                 sub_path = os.path.join(tmp_dir, f"scene_{idx}_sub.txt")
                 segment_path = os.path.join(tmp_dir, f"seg_{idx:03d}.mp4")
 
-                # 1. Fetch or generate image
-                await self._prepare_image(scene.get("image_url"), img_path, scene_num, tmp_dir)
+                # 1. Check if scene has a video clip (e.g. from fal.ai) or image
+                has_video = False
+                if scene.get("video_url"):
+                    has_video = await self._prepare_video(scene.get("video_url"), vid_path, scene_num)
+
+                if not has_video:
+                    # Fetch or generate image
+                    await self._prepare_image(scene.get("image_url"), img_path, scene_num, tmp_dir)
 
                 # 2. Fetch or synthesize audio
                 narration = scene.get("narration", "")
@@ -157,7 +164,8 @@ class RenderEngineService:
                 # 4. Render individual scene segment
                 camera_motion = scene.get("camera_motion", "push")
                 await self._render_scene_segment(
-                    img_path=img_path,
+                    img_path=img_path if not has_video else "",
+                    video_path=vid_path if has_video else None,
                     audio_path=audio_path,
                     sub_path=sub_path if has_subtitle else None,
                     output_segment=segment_path,
@@ -247,6 +255,29 @@ class RenderEngineService:
                 dest_path
             ])
 
+    async def _prepare_video(self, video_url: Optional[str], dest_path: str, scene_num: int) -> bool:
+        """Downloads a video clip from URL or copies local video file."""
+        if not video_url:
+            return False
+        if os.path.isfile(video_url):
+            try:
+                shutil.copy2(video_url, dest_path)
+                return True
+            except Exception as e:
+                print(f"[RenderEngine] Failed to copy local video for scene {scene_num}: {e}")
+                return False
+        if video_url.startswith("http://") or video_url.startswith("https://"):
+            try:
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                    resp = await client.get(video_url)
+                    if resp.status_code == 200 and len(resp.content) > 1000:
+                        with open(dest_path, "wb") as f:
+                            f.write(resp.content)
+                        return True
+            except Exception as e:
+                print(f"[RenderEngine] Video clip download failed for scene {scene_num}: {e}")
+        return False
+
     async def _prepare_audio(self, audio_url: Optional[str], narration: str, dest_path: str, duration: float):
         """Downloads the audio, synthesizes via VoiceGeneratorService, or creates silence."""
         obtained = False
@@ -296,13 +327,64 @@ class RenderEngineService:
         sub_path: Optional[str],
         output_segment: str,
         duration: float,
-        camera_motion: str = "push"
+        camera_motion: str = "push",
+        video_path: Optional[str] = None
     ):
-        """Renders one 9:16 vertical scene segment with Ken Burns motion and burnt subtitles."""
+        """Renders one 9:16 vertical scene segment with Ken Burns motion or video clip and burnt subtitles."""
         fps = 30
         total_frames = max(int(duration * fps), 30)
 
-        # Build zoompan filter based on camera motion
+        # 1. Video clip branch: if a video clip is provided, loop/trim and burn subtitles
+        if video_path and os.path.isfile(video_path):
+            filter_chain = (
+                "scale=1080:1920:force_original_aspect_ratio=increase,"
+                "crop=1080:1920,"
+                f"fps={fps}"
+            )
+            if sub_path and os.path.isfile(sub_path):
+                escaped_sub = sub_path.replace("\\", "/").replace(":", "\\:")
+                drawtext_filter = (
+                    f"drawtext=textfile='{escaped_sub}':"
+                    f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:"
+                    f"box=1:boxcolor=black@0.6:boxborderw=10:"
+                    f"x=(w-text_w)/2:y=h-th-260"
+                )
+                filter_chain += f",{drawtext_filter}"
+
+            args = [
+                "-y",
+                "-stream_loop", "-1",
+                "-t", f"{duration:.2f}",
+                "-i", video_path,
+                "-i", audio_path,
+                "-filter_complex", filter_chain,
+                "-c:v", "libx264",
+                "-pix_fmt", "yuv420p",
+                "-r", str(fps),
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-ar", "44100",
+                "-shortest",
+                "-preset", "veryfast",
+                output_segment
+            ]
+
+            ret, _, err = await self._run_ffmpeg(args)
+            if ret != 0 or not os.path.isfile(output_segment) or os.path.getsize(output_segment) == 0:
+                if sub_path:
+                    plain_filter = (
+                        "scale=1080:1920:force_original_aspect_ratio=increase,"
+                        "crop=1080:1920,"
+                        f"fps={fps}"
+                    )
+                    args[args.index(filter_chain)] = plain_filter
+                    ret, _, err = await self._run_ffmpeg(args)
+
+                if ret != 0 or not os.path.isfile(output_segment) or os.path.getsize(output_segment) == 0:
+                    raise RuntimeError(f"FFmpeg video scene render error: {err}")
+            return
+
+        # 2. Image animation branch: build zoompan filter based on camera motion
         # Target resolution 1080x1920
         # First scale to at least 1080x1920 maintaining aspect ratio, then crop/zoom
         if camera_motion in ["push", "zoom_in"]:

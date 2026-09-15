@@ -6,14 +6,17 @@ import hashlib
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from functools import partial
-from fastapi import APIRouter, Depends, Body, Response, Request
+from fastapi import APIRouter, Depends, Body, Response, Request, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db, get_current_user_id
-from app.core.rate_limit import rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen, rate_limit_pipeline, rate_limit_image_proxy
+from app.core.rate_limit import (
+    rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen,
+    rate_limit_pipeline, rate_limit_image_proxy, rate_limit_video_gen
+)
 from app.schemas.project import ProjectResponse
 from app.services.ai_pipeline_service import AIPipelineService
 from app.services.ai.subtitle_generator import SubtitleGeneratorService
@@ -534,3 +537,194 @@ async def generate_scenes_from_script(
 
     scenes = await analyzer.analyze_script(script_text, style=style, language=language)
     return {"scenes": scenes, "scene_count": len(scenes), "source": source}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# fal.ai Text-to-Video Generation Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/generate-scene-video")
+async def generate_scene_video(
+    payload: dict = Body(...),
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(rate_limit_video_gen)
+):
+    """
+    Submits a Text-to-Video generation job to fal.ai for a specific scene visual.
+    The scene's spoken script/narration and subtitles remain strictly authoritative and untouched.
+    """
+    scene_id_str = payload.get("scene_id")
+    if not scene_id_str:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="scene_id is required")
+
+    try:
+        scene_uuid = UUID(str(scene_id_str))
+        user_uuid = UUID(str(current_user_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid scene_id or user_id format")
+
+    from app.models.models import Scene, VideoGenerationStatus
+    from app.repositories.video_job_repo import VideoJobRepository
+    from app.services.ai.fal_video_service import fal_video_service, sanitize_error
+
+    # Verify scene exists and user owns the project (strict IDOR protection)
+    result = await db.execute(
+        select(Scene).options(selectinload(Scene.project)).where(Scene.id == scene_uuid)
+    )
+    scene = result.scalar_one_or_none()
+    if not scene or not scene.project or str(scene.project.user_id) != str(user_uuid):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scene not found or unauthorized")
+
+    video_repo = VideoJobRepository(db)
+
+    # Concurrency & duplicate-job protection: check for any active pending/running job
+    active_job = await video_repo.get_active_job_for_scene(scene_uuid)
+    if active_job:
+        return {
+            "job_id": str(active_job.id),
+            "status": active_job.status,
+            "scene_id": str(scene.id),
+            "provider": active_job.provider,
+            "message": "Video generation job is already in progress for this scene"
+        }
+
+    # Visual prompt: use prompt from payload or scene's image_prompt.
+    # Note: scene.narration is preserved exclusively for TTS audio and subtitles.
+    prompt = (payload.get("prompt") or scene.image_prompt or "").strip()
+    if not prompt:
+        prompt = f"Cinematic vertical 9:16 scene, {scene.narration or 'engaging visual'}, highly detailed, photorealistic, 8k"
+
+    aspect_ratio = payload.get("aspect_ratio", "9:16")
+    duration = str(payload.get("duration", "5"))
+
+    try:
+        queue_data = await fal_video_service.submit_text_to_video(
+            prompt=prompt,
+            aspect_ratio=aspect_ratio,
+            duration=duration
+        )
+    except Exception as e:
+        safe_msg = sanitize_error(str(e))
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Video provider error: {safe_msg}")
+
+    job = await video_repo.create_job(
+        scene_id=scene.id,
+        project_id=scene.project_id,
+        user_id=user_uuid,
+        prompt=prompt,
+        provider="fal.ai",
+        provider_request_id=queue_data.get("request_id"),
+        status_url=queue_data.get("status_url"),
+        response_url=queue_data.get("response_url"),
+        status=VideoGenerationStatus.in_queue.value
+    )
+
+    return {
+        "job_id": str(job.id),
+        "status": job.status,
+        "scene_id": str(scene.id),
+        "provider": "fal.ai"
+    }
+
+
+@router.get("/video-jobs/{job_id}")
+async def get_video_job_status(
+    job_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Checks the status of a video generation job and syncs results to the scene assets.
+    Enforces strict user ownership IDOR isolation.
+    """
+    from app.models.models import SceneAsset, AssetType, VideoGenerationStatus
+    from app.repositories.video_job_repo import VideoJobRepository
+    from app.services.ai.fal_video_service import fal_video_service, sanitize_error
+
+    user_uuid = UUID(str(current_user_id))
+    video_repo = VideoJobRepository(db)
+    job = await video_repo.get_by_id(job_id)
+
+    if not job or str(job.user_id) != str(user_uuid):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video job not found")
+
+    # If already completed or failed, return directly
+    if job.status in (VideoGenerationStatus.completed.value, VideoGenerationStatus.failed.value):
+        return {
+            "job_id": str(job.id),
+            "status": job.status,
+            "scene_id": str(job.scene_id),
+            "video_url": job.video_url,
+            "error": sanitize_error(job.error_message)
+        }
+
+    # Poll status from fal.ai if status_url is available
+    if job.status_url:
+        try:
+            status_res = await fal_video_service.check_status(job.status_url)
+            curr_status = status_res.get("status", "in_progress")
+
+            if curr_status == "completed":
+                # Fetch final result
+                result_data = await fal_video_service.fetch_result(job.response_url)
+                video_url = result_data.get("video_url")
+
+                # Upsert SceneAsset with asset_type=video
+                asset_res = await db.execute(
+                    select(SceneAsset).where(
+                        SceneAsset.scene_id == job.scene_id,
+                        SceneAsset.asset_type == AssetType.video
+                    )
+                )
+                existing_asset = asset_res.scalar_one_or_none()
+                if existing_asset:
+                    existing_asset.url = video_url
+                    existing_asset.storage_path = video_url
+                    existing_asset.metadata_json = {
+                        "provider": "fal.ai",
+                        "job_id": str(job.id),
+                        "prompt": job.prompt
+                    }
+                else:
+                    new_asset = SceneAsset(
+                        scene_id=job.scene_id,
+                        asset_type=AssetType.video,
+                        url=video_url,
+                        storage_path=video_url,
+                        metadata_json={
+                            "provider": "fal.ai",
+                            "job_id": str(job.id),
+                            "prompt": job.prompt
+                        }
+                    )
+                    db.add(new_asset)
+
+                job = await video_repo.update_status(
+                    job=job,
+                    status=VideoGenerationStatus.completed.value,
+                    video_url=video_url
+                )
+            elif curr_status == "failed":
+                err_msg = status_res.get("data", {}).get("error", "Video generation failed on provider")
+                job = await video_repo.update_status(
+                    job=job,
+                    status=VideoGenerationStatus.failed.value,
+                    error_message=sanitize_error(err_msg)
+                )
+            else:
+                job = await video_repo.update_status(
+                    job=job,
+                    status=curr_status
+                )
+        except Exception as e:
+            safe_err = sanitize_error(str(e))
+            pass
+
+    return {
+        "job_id": str(job.id),
+        "status": job.status,
+        "scene_id": str(job.scene_id),
+        "video_url": job.video_url,
+        "error": sanitize_error(job.error_message)
+    }

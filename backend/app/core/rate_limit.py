@@ -100,4 +100,5 @@ rate_limit_tts = RateLimitDependency(30, 60)
 rate_limit_image_gen = RateLimitDependency(15, 60)
 rate_limit_pipeline = RateLimitDependency(5, 60)
 rate_limit_image_proxy = RateLimitDependency(30, 60)
+rate_limit_video_gen = RateLimitDependency(5, 60)
 

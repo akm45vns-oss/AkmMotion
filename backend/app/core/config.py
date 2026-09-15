@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     ELEVENLABS_API_KEY: str = ""
     REPLICATE_API_TOKEN: str = ""
+    # fal.ai Text-to-Video
+    FAL_KEY: str = ""
+    FAL_VIDEO_MODEL: str = "fal-ai/kling-video/v1/standard/text-to-video"
+    FAL_VIDEO_ENABLED: bool = True
     # Groq API keys — all 5 used for round-robin rotation & rate-limit failover
     GROQ_API_KEY:   str = ""  # Primary
     GROQ_API_KEY_2: str = ""

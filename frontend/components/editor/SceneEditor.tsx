@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { useEditorStore } from "@/lib/stores/editorStore";
 import { scenesApi } from "@/lib/api/scenes";
+import { aiApi } from "@/lib/api/ai";
 import {
   Type, ImageIcon, Sliders, Mic2, RefreshCw, Sparkles,
-  Film, Subtitles, Crop, Wand2
+  Film, Subtitles, Crop, Wand2, Video
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api/client";
 
@@ -52,6 +53,13 @@ export default function SceneEditor() {
   const [regenLoading,   setRegenLoading]   = useState(false);
   const [regenSuccess,   setRegenSuccess]   = useState(false);
   const [enhanceLoading, setEnhanceLoading] = useState(false);
+  const [videoGenLoading, setVideoGenLoading] = useState(false);
+  const [videoJobStatus, setVideoJobStatus] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+
+  const hasVideoAsset = Boolean(
+    activeScene?.assets?.some((a: any) => a.asset_type === "video" && a.url)
+  );
 
   useEffect(() => {
     if (activeScene) {
@@ -61,6 +69,8 @@ export default function SceneEditor() {
       setAnimationStyle(activeScene.animation_style || "ken_burns");
       setDuration(activeScene.duration || 7.0);
       setRegenSuccess(false);
+      setVideoError(null);
+      setVideoJobStatus(null);
     }
   }, [activeSceneIndex, activeScene]);
 
@@ -152,6 +162,62 @@ export default function SceneEditor() {
       console.error("Enhance prompt error:", err);
     } finally {
       setEnhanceLoading(false);
+    }
+  };
+
+  // ── fal.ai Text-to-Video generation ────────────────────────────────────────
+  const handleGenerateVideo = async () => {
+    if (!activeScene) return;
+    setVideoGenLoading(true);
+    setVideoError(null);
+    setVideoJobStatus("Submitting to fal.ai...");
+    try {
+      const res = await aiApi.generateSceneVideo(
+        activeScene.id,
+        imagePrompt || activeScene.image_prompt,
+        String(duration)
+      );
+      const jobId = res.job_id;
+      setVideoJobStatus(res.message ? "Existing job running..." : "In Queue (fal.ai)...");
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const job = await aiApi.getVideoJobStatus(jobId);
+          if (job.status === "completed" && job.video_url) {
+            clearInterval(pollInterval);
+            setVideoJobStatus(null);
+            setVideoGenLoading(false);
+            const existingAssets = activeScene.assets || [];
+            const updatedAssets = [
+              ...existingAssets.filter((a: any) => a.asset_type !== "video"),
+              {
+                id: "fal-vid-" + Date.now(),
+                asset_type: "video",
+                url: job.video_url,
+                metadata_json: { provider: "fal.ai", job_id: jobId },
+              },
+            ];
+            updateSceneInStore(activeScene.id, { assets: updatedAssets } as any);
+          } else if (job.status === "failed") {
+            clearInterval(pollInterval);
+            setVideoGenLoading(false);
+            setVideoJobStatus(null);
+            setVideoError(job.error || "fal.ai video generation failed");
+          } else if (job.status === "in_progress") {
+            setVideoJobStatus("Generating video clip...");
+          } else {
+            setVideoJobStatus(`Status: ${job.status}`);
+          }
+        } catch (e: any) {
+          console.error("Video poll error:", e);
+        }
+      }, 3000);
+    } catch (err: any) {
+      console.error("Generate video error:", err);
+      setVideoGenLoading(false);
+      setVideoJobStatus(null);
+      const detail = err?.response?.data?.detail;
+      setVideoError(typeof detail === "string" ? detail : "Failed to generate video");
     }
   };
 
@@ -266,31 +332,68 @@ export default function SceneEditor() {
           />
 
           {/* Secondary Actions for Visuals */}
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleEnhancePrompt}
-              disabled={enhanceLoading || regenLoading}
-              className="btn-secondary text-[11px] py-1 px-2.5 min-h-[32px] border border-[#292A29] disabled:opacity-40"
-              title="Enhance prompt with AI Director"
-            >
-              <Sparkles className={`w-3 h-3 text-[#E76536] ${enhanceLoading ? "animate-spin" : ""}`} />
-              <span>{enhanceLoading ? "Writing..." : "AI Prompt"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleRegenerateImage}
-              disabled={regenLoading || enhanceLoading}
-              className={`text-[11px] py-1 px-3 rounded-md font-medium border transition-colors flex items-center gap-1.5 min-h-[32px] ${
-                regenSuccess
-                  ? "border-[#4FAE7B] text-[#4FAE7B] bg-[#4FAE7B]/10"
-                  : "border-[#292A29] bg-[#151616] text-[#A9A49B] hover:text-[#F5F1E8] hover:border-[#383938]"
-              } disabled:opacity-40 disabled:cursor-not-allowed`}
-            >
-              <RefreshCw className={`w-3 h-3 ${regenLoading ? "animate-spin" : ""}`} />
-              <span>{regenSuccess ? "Generated!" : regenLoading ? "Generating..." : "Regenerate Visual"}</span>
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleGenerateVideo}
+                disabled={videoGenLoading || regenLoading || enhanceLoading}
+                className={`text-[11px] py-1 px-3 rounded-md font-medium border transition-colors flex items-center gap-1.5 min-h-[32px] ${
+                  hasVideoAsset
+                    ? "border-[#4FAE7B] text-[#4FAE7B] bg-[#4FAE7B]/10 hover:bg-[#4FAE7B]/15"
+                    : "border-[#E76536]/40 text-[#E76536] bg-[#E76536]/10 hover:bg-[#E76536]/15 hover:border-[#E76536]"
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+                title="Generate AI video clip with fal.ai"
+              >
+                <Video className={`w-3.5 h-3.5 ${videoGenLoading ? "animate-spin" : ""}`} />
+                <span>
+                  {videoGenLoading
+                    ? (videoJobStatus || "fal.ai Generating...")
+                    : hasVideoAsset
+                    ? "Regenerate fal Video"
+                    : "Generate fal Video"}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleEnhancePrompt}
+                disabled={enhanceLoading || regenLoading || videoGenLoading}
+                className="btn-secondary text-[11px] py-1 px-2.5 min-h-[32px] border border-[#292A29] disabled:opacity-40"
+                title="Enhance prompt with AI Director"
+              >
+                <Sparkles className={`w-3 h-3 text-[#E76536] ${enhanceLoading ? "animate-spin" : ""}`} />
+                <span>{enhanceLoading ? "Writing..." : "AI Prompt"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRegenerateImage}
+                disabled={regenLoading || enhanceLoading || videoGenLoading}
+                className={`text-[11px] py-1 px-3 rounded-md font-medium border transition-colors flex items-center gap-1.5 min-h-[32px] ${
+                  regenSuccess
+                    ? "border-[#4FAE7B] text-[#4FAE7B] bg-[#4FAE7B]/10"
+                    : "border-[#292A29] bg-[#151616] text-[#A9A49B] hover:text-[#F5F1E8] hover:border-[#383938]"
+                } disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                <RefreshCw className={`w-3 h-3 ${regenLoading ? "animate-spin" : ""}`} />
+                <span>{regenSuccess ? "Generated!" : regenLoading ? "Generating..." : "Regenerate Visual"}</span>
+              </button>
+            </div>
           </div>
+
+          {videoError && (
+            <div className="p-2 rounded bg-red-950/40 border border-red-800/40 text-[10px] text-red-300">
+              {videoError}
+            </div>
+          )}
+          {hasVideoAsset && !videoGenLoading && (
+            <div className="flex items-center gap-1 text-[10px] text-[#4FAE7B]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#4FAE7B] inline-block" />
+              <span>fal.ai video clip active for this scene</span>
+            </div>
+          )}
         </div>
 
         {/* ─────────────── 4. ANIMATION & DURATION ───────────────────────── */}
