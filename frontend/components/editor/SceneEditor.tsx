@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useEditorStore } from "@/lib/stores/editorStore";
-import { scenesApi } from "@/lib/api/scenes";
+import { scenesApi, Scene } from "@/lib/api/scenes";
 import { aiApi } from "@/lib/api/ai";
 import {
   Type, ImageIcon, Sliders, Mic2, RefreshCw, Sparkles,
-  Film, Subtitles, Crop, Wand2, Video
+  Film, Subtitles, Crop, Wand2, Video, Check, AlertCircle
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api/client";
 
@@ -30,6 +30,7 @@ export default function SceneEditor() {
   const {
     scenes,
     activeSceneIndex,
+    activeSceneId,
     updateSceneInStore,
     subtitleStyle,
     setSubtitleStyle,
@@ -41,15 +42,19 @@ export default function SceneEditor() {
     setStylePreset,
   } = useEditorStore();
 
-  const activeScene = scenes[activeSceneIndex];
+  const activeScene =
+    (activeSceneId ? scenes.find((s) => s.id === activeSceneId) : null) ||
+    scenes[activeSceneIndex] ||
+    scenes[0];
   const fullProjectScript = scenes.map((s) => s.narration).join(" ");
 
   const [narration,      setNarration]      = useState("");
   const [subtitle,       setSubtitle]       = useState("");
   const [imagePrompt,    setImagePrompt]    = useState("");
   const [animationStyle, setAnimationStyle] = useState("ken_burns");
-  const [duration,       setDuration]       = useState(7.0);
-  const [saving,         setSaving]         = useState(false);
+  const [duration,       setDuration]       = useState(5.0);
+  const [saveStatus,     setSaveStatus]     = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError,      setSaveError]      = useState<string | null>(null);
   const [regenLoading,   setRegenLoading]   = useState(false);
   const [regenSuccess,   setRegenSuccess]   = useState(false);
   const [enhanceLoading, setEnhanceLoading] = useState(false);
@@ -57,22 +62,37 @@ export default function SceneEditor() {
   const [videoJobStatus, setVideoJobStatus] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
 
+  const currentSceneIdRef = useRef<string | null>(null);
+
+  const isDirty = Boolean(
+    activeScene && (
+      narration !== (activeScene.narration || "") ||
+      subtitle !== (activeScene.subtitle || "") ||
+      imagePrompt !== (activeScene.image_prompt || "") ||
+      animationStyle !== (activeScene.animation_style || "ken_burns") ||
+      (Number.isFinite(duration) && duration !== (activeScene.duration || 5.0))
+    )
+  );
+
   const hasVideoAsset = Boolean(
     activeScene?.assets?.some((a: any) => a.asset_type === "video" && a.url)
   );
 
   useEffect(() => {
-    if (activeScene) {
+    if (activeScene && activeScene.id !== currentSceneIdRef.current) {
+      currentSceneIdRef.current = activeScene.id;
       setNarration(activeScene.narration || "");
       setSubtitle(activeScene.subtitle || "");
       setImagePrompt(activeScene.image_prompt || "");
       setAnimationStyle(activeScene.animation_style || "ken_burns");
-      setDuration(activeScene.duration || 7.0);
+      setDuration(activeScene.duration || 5.0);
       setRegenSuccess(false);
       setVideoError(null);
       setVideoJobStatus(null);
+      setSaveStatus("idle");
+      setSaveError(null);
     }
-  }, [activeSceneIndex, activeScene]);
+  }, [activeScene?.id]);
 
   if (!activeScene) {
     return (
@@ -85,20 +105,48 @@ export default function SceneEditor() {
 
   // ── Save scene changes ────────────────────────────────────────────────────
   const handleSave = async () => {
-    setSaving(true);
+    if (!activeScene || saveStatus === "saving") return;
+
+    setSaveStatus("saving");
+    setSaveError(null);
+
+    const validDuration =
+      Number.isFinite(duration) && duration >= 0.5
+        ? Number(duration)
+        : (activeScene.duration || 5.0);
+
     try {
-      const updated = await scenesApi.update(activeScene.id, {
+      const payload: Partial<Scene> = {
         narration,
         subtitle,
         image_prompt: imagePrompt,
         animation_style: animationStyle as any,
-        duration,
-      });
+        duration: validDuration,
+      };
+
+      const updated = await scenesApi.update(activeScene.id, payload);
       updateSceneInStore(activeScene.id, updated);
-    } catch (err) {
+
+      // Synchronize canonical values from backend response
+      if (updated.duration !== undefined) setDuration(updated.duration);
+      if (updated.animation_style !== undefined) setAnimationStyle(updated.animation_style);
+      if (updated.image_prompt !== undefined) setImagePrompt(updated.image_prompt);
+      if (updated.subtitle !== undefined) setSubtitle(updated.subtitle);
+      if (updated.narration !== undefined) setNarration(updated.narration);
+
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setSaveStatus((prev) => (prev === "saved" ? "idle" : prev));
+      }, 2500);
+    } catch (err: any) {
       console.error("Save scene error:", err);
-    } finally {
-      setSaving(false);
+      setSaveStatus("error");
+      const detail = err?.response?.data?.detail;
+      setSaveError(
+        typeof detail === "string"
+          ? detail
+          : "Could not save scene changes. Please try again."
+      );
     }
   };
 
@@ -107,11 +155,15 @@ export default function SceneEditor() {
     setRegenLoading(true);
     setRegenSuccess(false);
     try {
+      const authToken =
+        localStorage.getItem("akmmotion_jwt_token") ||
+        localStorage.getItem("access_token") ||
+        "";
       const res = await fetch(`${API_BASE_URL}/ai/regenerate-scene-image`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           scene_id: activeScene.id,
@@ -140,11 +192,15 @@ export default function SceneEditor() {
     if (!activeScene) return;
     setEnhanceLoading(true);
     try {
+      const authToken =
+        localStorage.getItem("akmmotion_jwt_token") ||
+        localStorage.getItem("access_token") ||
+        "";
       const res = await fetch(`${API_BASE_URL}/ai/generate-scene-prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           narration: narration || activeScene.narration,
@@ -421,10 +477,13 @@ export default function SceneEditor() {
             <input
               type="number"
               step="0.5"
-              min="3"
-              max="15"
-              value={duration}
-              onChange={(e) => setDuration(parseFloat(e.target.value))}
+              min="0.5"
+              max="60"
+              value={duration || ""}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setDuration(isNaN(val) ? 0 : val);
+              }}
               className="input-base text-xs py-2 font-mono"
             />
           </div>
@@ -432,16 +491,51 @@ export default function SceneEditor() {
       </div>
 
       {/* ── 5. ACTIONS (PRIMARY CTA) ─────────────────────────────────────────── */}
-      <div className="p-4 border-t border-[#292A29] bg-[#151616]">
+      <div className="p-4 border-t border-[#292A29] bg-[#151616] space-y-2">
+        {saveError && (
+          <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-800/60 text-[11px] text-red-200 flex items-center gap-2 animate-in fade-in duration-200">
+            <AlertCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
         <button
+          type="button"
           onClick={handleSave}
-          disabled={saving}
-          className="btn-primary w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-2 shadow-sm"
+          disabled={saveStatus === "saving" || (!isDirty && saveStatus === "idle")}
+          className={`w-full py-2.5 text-xs font-semibold flex items-center justify-center gap-2 rounded-md transition-all shadow-sm ${
+            saveStatus === "saved"
+              ? "bg-[#4FAE7B] hover:bg-[#4FAE7B]/90 text-white shadow-[#4FAE7B]/20"
+              : saveStatus === "error"
+              ? "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
+              : isDirty
+              ? "btn-primary ring-1 ring-[#E76536]/30 cursor-pointer"
+              : "btn-secondary text-[#77746E] border-[#292A29] opacity-60 cursor-not-allowed"
+          }`}
         >
-          {saving ? (
-            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving Changes...</>
-          ) : (
-            <><Wand2 className="w-3.5 h-3.5" /> APPLY CHANGES</>
+          {saveStatus === "saving" && (
+            <>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>SAVING...</span>
+            </>
+          )}
+          {saveStatus === "saved" && (
+            <>
+              <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" />
+              <span>SAVED</span>
+            </>
+          )}
+          {saveStatus === "error" && (
+            <>
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>FAILED — RETRY</span>
+            </>
+          )}
+          {saveStatus === "idle" && (
+            <>
+              <Wand2 className="w-3.5 h-3.5" />
+              <span>APPLY CHANGES</span>
+            </>
           )}
         </button>
       </div>
