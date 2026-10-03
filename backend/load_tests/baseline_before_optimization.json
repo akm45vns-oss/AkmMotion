@@ -1,0 +1,189 @@
+{
+  "timestamp": "2026-09-17T06:50:07Z",
+  "description": "Pre-optimization baseline capturing 10, 25, 50, 100 user concurrency and system metrics",
+  "stages": [
+    {
+      "stage": "Tier 1 - Baseline Load",
+      "concurrency": 10,
+      "total_requests": 100,
+      "elapsed_seconds": 221.11,
+      "rps": 0.45,
+      "latency_min_ms": 1.7,
+      "latency_p50_ms": 5333.49,
+      "latency_p95_ms": 60098.94,
+      "latency_p99_ms": 64140.93,
+      "latency_max_ms": 64140.93,
+      "error_count": 20,
+      "error_rate_pct": 20.0,
+      "status_codes": {
+        "200": 80,
+        "503": 6
+      },
+      "process_ram_mb": 125.29,
+      "process_cpu_pct": 13.3,
+      "postgres_pool": {
+        "before": {
+          "pool_size": 5,
+          "checkedin": 0,
+          "checkedout": 0,
+          "overflow": -5
+        },
+        "after": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        }
+      },
+      "network_latency_to_db_ms": 6028.23,
+      "redis_telemetry": {
+        "status": "in_memory_fallback",
+        "note": "Redis broker unreachable; using thread-safe sliding window in-memory fallback"
+      },
+      "celery_telemetry": {
+        "status": "in_process_fallback",
+        "active_workers": 0,
+        "queue_depth": 0,
+        "note": "Async background tasks running via FastAPI BackgroundTasks"
+      },
+      "active_ffmpeg_processes": 0
+    },
+    {
+      "stage": "Tier 2 - Moderate Load",
+      "concurrency": 25,
+      "total_requests": 200,
+      "elapsed_seconds": 9.17,
+      "rps": 21.8,
+      "latency_min_ms": 3.62,
+      "latency_p50_ms": 155.56,
+      "latency_p95_ms": 4266.28,
+      "latency_p99_ms": 4415.52,
+      "latency_max_ms": 4430.53,
+      "error_count": 100,
+      "error_rate_pct": 50.0,
+      "status_codes": {
+        "200": 100,
+        "503": 34
+      },
+      "process_ram_mb": 144.46,
+      "process_cpu_pct": 15.2,
+      "postgres_pool": {
+        "before": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        },
+        "after": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        }
+      },
+      "network_latency_to_db_ms": 0.0,
+      "redis_telemetry": {
+        "status": "in_memory_fallback",
+        "note": "Redis broker unreachable; using thread-safe sliding window in-memory fallback"
+      },
+      "celery_telemetry": {
+        "status": "in_process_fallback",
+        "active_workers": 0,
+        "queue_depth": 0,
+        "note": "Async background tasks running via FastAPI BackgroundTasks"
+      },
+      "active_ffmpeg_processes": 0
+    },
+    {
+      "stage": "Tier 3 - Peak SaaS Load",
+      "concurrency": 50,
+      "total_requests": 300,
+      "elapsed_seconds": 58.27,
+      "rps": 5.15,
+      "latency_min_ms": 1.65,
+      "latency_p50_ms": 8085.98,
+      "latency_p95_ms": 23095.98,
+      "latency_p99_ms": 28597.54,
+      "latency_max_ms": 34775.95,
+      "error_count": 21,
+      "error_rate_pct": 7.0,
+      "status_codes": {
+        "200": 279,
+        "503": 7
+      },
+      "process_ram_mb": 149.58,
+      "process_cpu_pct": 21.1,
+      "postgres_pool": {
+        "before": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        },
+        "after": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        }
+      },
+      "network_latency_to_db_ms": 0.0,
+      "redis_telemetry": {
+        "status": "in_memory_fallback",
+        "note": "Redis broker unreachable; using thread-safe sliding window in-memory fallback"
+      },
+      "celery_telemetry": {
+        "status": "in_process_fallback",
+        "active_workers": 0,
+        "queue_depth": 0,
+        "note": "Async background tasks running via FastAPI BackgroundTasks"
+      },
+      "active_ffmpeg_processes": 0
+    },
+    {
+      "stage": "Tier 4 - Stress / Surge",
+      "concurrency": 100,
+      "total_requests": 400,
+      "elapsed_seconds": 58.9,
+      "rps": 6.79,
+      "latency_min_ms": 1.54,
+      "latency_p50_ms": 16133.98,
+      "latency_p95_ms": 22275.4,
+      "latency_p99_ms": 25622.26,
+      "latency_max_ms": 27565.12,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 400
+      },
+      "process_ram_mb": 150.27,
+      "process_cpu_pct": 16.8,
+      "postgres_pool": {
+        "before": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        },
+        "after": {
+          "pool_size": 5,
+          "checkedin": 5,
+          "checkedout": 0,
+          "overflow": 0
+        }
+      },
+      "network_latency_to_db_ms": 2316.68,
+      "redis_telemetry": {
+        "status": "in_memory_fallback",
+        "note": "Redis broker unreachable; using thread-safe sliding window in-memory fallback"
+      },
+      "celery_telemetry": {
+        "status": "in_process_fallback",
+        "active_workers": 0,
+        "queue_depth": 0,
+        "note": "Async background tasks running via FastAPI BackgroundTasks"
+      },
+      "active_ffmpeg_processes": 0
+    }
+  ]
+}

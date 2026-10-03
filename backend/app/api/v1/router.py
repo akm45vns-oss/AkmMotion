@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, projects, ai, scenes, render, settings, characters
+from app.api.v1.endpoints import auth, projects, ai, scenes, render, settings, characters, storage, workspaces
 
 api_router = APIRouter(prefix="/v1")
 
@@ -11,6 +11,9 @@ api_router.include_router(scenes.router)
 api_router.include_router(render.router)
 api_router.include_router(settings.router)
 api_router.include_router(characters.router)
+api_router.include_router(storage.router)
+api_router.include_router(workspaces.router)
+
 
 
 @api_router.get("/health", tags=["Health"])

@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-09-17T15:01:02Z",
+  "topology": "Production-Like Colocated (PostgreSQL 16 + Redis 5.0 on Loopback)",
+  "user_concurrency_benchmarks": [
+    {
+      "stage": "Tier 1 - Baseline Load",
+      "concurrency": 10,
+      "total_requests": 100,
+      "elapsed_seconds": 0.68,
+      "rps": 147.58,
+      "latency_min_ms": 1.4,
+      "latency_p50_ms": 45.42,
+      "latency_p95_ms": 243.55,
+      "latency_p99_ms": 365.38,
+      "latency_max_ms": 365.38,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 100
+      },
+      "ram_mb": 117.84,
+      "cpu_pct": 48.7,
+      "db_connections": 11,
+      "db_latency_ms": 37.87,
+      "redis_latency_ms": -1.0,
+      "queue_depth": 0
+    },
+    {
+      "stage": "Tier 2 - Moderate Load",
+      "concurrency": 25,
+      "total_requests": 200,
+      "elapsed_seconds": 0.81,
+      "rps": 247.12,
+      "latency_min_ms": 13.71,
+      "latency_p50_ms": 101.69,
+      "latency_p95_ms": 175.7,
+      "latency_p99_ms": 228.75,
+      "latency_max_ms": 243.53,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 200
+      },
+      "ram_mb": 127.79,
+      "cpu_pct": 57.8,
+      "db_connections": 20,
+      "db_latency_ms": 38.52,
+      "redis_latency_ms": -1.0,
+      "queue_depth": 0
+    },
+    {
+      "stage": "Tier 3 - Peak SaaS Load",
+      "concurrency": 50,
+      "total_requests": 300,
+      "elapsed_seconds": 1.33,
+      "rps": 225.48,
+      "latency_min_ms": 2.97,
+      "latency_p50_ms": 214.91,
+      "latency_p95_ms": 398.91,
+      "latency_p99_ms": 485.7,
+      "latency_max_ms": 510.29,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 300
+      },
+      "ram_mb": 135.16,
+      "cpu_pct": 60.4,
+      "db_connections": 21,
+      "db_latency_ms": 35.47,
+      "redis_latency_ms": -1.0,
+      "queue_depth": 0
+    },
+    {
+      "stage": "Tier 4 - Stress / Surge",
+      "concurrency": 100,
+      "total_requests": 400,
+      "elapsed_seconds": 2.22,
+      "rps": 180.34,
+      "latency_min_ms": 12.86,
+      "latency_p50_ms": 538.94,
+      "latency_p95_ms": 985.8,
+      "latency_p99_ms": 1212.84,
+      "latency_max_ms": 1401.47,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 400
+      },
+      "ram_mb": 139.16,
+      "cpu_pct": 39.3,
+      "db_connections": 21,
+      "db_latency_ms": 37.05,
+      "redis_latency_ms": -1.0,
+      "queue_depth": 0
+    },
+    {
+      "stage": "Tier 5 - Saturation Stress",
+      "concurrency": 250,
+      "total_requests": 500,
+      "elapsed_seconds": 2.92,
+      "rps": 171.26,
+      "latency_min_ms": 59.56,
+      "latency_p50_ms": 837.6,
+      "latency_p95_ms": 2497.29,
+      "latency_p99_ms": 2659.49,
+      "latency_max_ms": 2734.79,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 500
+      },
+      "ram_mb": 161.54,
+      "cpu_pct": 41.9,
+      "db_connections": 21,
+      "db_latency_ms": 40.3,
+      "redis_latency_ms": -1.0,
+      "queue_depth": 0
+    }
+  ]
+}

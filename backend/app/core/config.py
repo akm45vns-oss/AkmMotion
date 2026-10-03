@@ -14,10 +14,21 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     BACKEND_URL: str = "http://localhost:8000"
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000"
+    TRUSTED_PROXIES: str = "127.0.0.1,::1,localhost,testclient"
+    INTERNAL_GATEWAY_KEY: str = ""
+
+    @property
+    def trusted_proxy_list(self) -> List[str]:
+        return [p.strip() for p in self.TRUSTED_PROXIES.split(",") if p.strip()]
 
     # Neon PostgreSQL Database
     DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_pYKgFxNOA25E@ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech/neondb?ssl=require"
     SYNC_DATABASE_URL: str = "postgresql://neondb_owner:npg_pYKgFxNOA25E@ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 300
+    PERFORMANCE_PROFILING_ENABLED: bool = False
 
     # Cloudflare R2 / S3 Storage Credentials
     R2_ACCOUNT_ID: str = ""
@@ -28,12 +39,39 @@ class Settings(BaseSettings):
     # JWT Authentication
     JWT_SECRET: str = "super-secret-jwt-key-change-in-production-min-32-chars"
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRE_MINUTES: int = 1440
+    JWT_EXPIRE_MINUTES: int = 1440  # Backward-compatible default
+    JWT_ACCESS_EXPIRE_MINUTES: int = 15
+    JWT_REFRESH_EXPIRE_DAYS: int = 7
+    INACTIVITY_TIMEOUT_SECONDS: int = 180  # 3 minutes
 
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    CELERY_TASK_ALWAYS_EAGER: bool = False
+    CELERY_WORKER_CONCURRENCY: int = 2
+
+    # Capacity Controls & Concurrency Limits
+    MAX_CONCURRENT_RENDERS_GLOBAL: int = 5
+    MAX_CONCURRENT_RENDERS_PER_USER: int = 1
+    MAX_QUEUED_JOBS_PER_USER: int = 3
+    MAX_SCENES_PER_RENDER: int = 50
+    MAX_RENDER_DURATION_SECONDS: int = 600
+    MAX_SIMULTANEOUS_AI_GENERATIONS: int = 3
+    RENDER_TIMEOUT_SECONDS: int = 600
+
+    # Storage Settings
+    LOCAL_STORAGE: bool = True
+    STORAGE_BASE_URL: str = ""
+    SIGNED_URL_EXPIRATION_SECONDS: int = 3600
+
+    # Cost Controls & Quota Limits
+    MAX_PROJECTS_PER_USER: int = 25
+    MAX_SCENES_PER_PROJECT: int = 50
+    MAX_SCRIPT_LENGTH: int = 5000
+    MAX_DAILY_AI_REQUESTS: int = 50
+    MAX_DAILY_VIDEO_GENERATIONS: int = 10
+    MAX_STORAGE_BYTES_PER_USER: int = 1073741824  # 1 GB
 
     # External AI APIs
     OPENAI_API_KEY: str = ""

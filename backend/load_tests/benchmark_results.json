@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-09-17T10:54:04Z",
+  "user_concurrency_benchmarks": [
+    {
+      "stage": "Tier 1 - Baseline Load",
+      "concurrency": 10,
+      "total_requests": 100,
+      "elapsed_seconds": 31.37,
+      "rps": 3.19,
+      "latency_min_ms": 1.09,
+      "latency_p50_ms": 1924.08,
+      "latency_p95_ms": 8779.71,
+      "latency_p99_ms": 10974.11,
+      "latency_max_ms": 10974.11,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 100
+      },
+      "ram_mb": 119.77,
+      "cpu_pct": 27.4
+    },
+    {
+      "stage": "Tier 2 - Moderate Load",
+      "concurrency": 25,
+      "total_requests": 200,
+      "elapsed_seconds": 21.95,
+      "rps": 9.11,
+      "latency_min_ms": 1.07,
+      "latency_p50_ms": 1925.87,
+      "latency_p95_ms": 6437.84,
+      "latency_p99_ms": 7550.18,
+      "latency_max_ms": 7611.35,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 200
+      },
+      "ram_mb": 131.81,
+      "cpu_pct": 24.9
+    },
+    {
+      "stage": "Tier 3 - Peak SaaS Load",
+      "concurrency": 50,
+      "total_requests": 300,
+      "elapsed_seconds": 18.21,
+      "rps": 16.48,
+      "latency_min_ms": 0.97,
+      "latency_p50_ms": 1922.53,
+      "latency_p95_ms": 7301.18,
+      "latency_p99_ms": 8045.79,
+      "latency_max_ms": 8283.49,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 300
+      },
+      "ram_mb": 140.06,
+      "cpu_pct": 35.4
+    },
+    {
+      "stage": "Tier 4 - Stress / Surge",
+      "concurrency": 100,
+      "total_requests": 400,
+      "elapsed_seconds": 21.66,
+      "rps": 18.47,
+      "latency_min_ms": 0.99,
+      "latency_p50_ms": 3955.17,
+      "latency_p95_ms": 9976.94,
+      "latency_p99_ms": 12403.2,
+      "latency_max_ms": 13179.79,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 400
+      },
+      "ram_mb": 79.95,
+      "cpu_pct": 33.9
+    },
+    {
+      "stage": "Tier 5 - Saturation Stress",
+      "concurrency": 250,
+      "total_requests": 500,
+      "elapsed_seconds": 19.89,
+      "rps": 25.14,
+      "latency_min_ms": 0.99,
+      "latency_p50_ms": 7619.65,
+      "latency_p95_ms": 17179.99,
+      "latency_p99_ms": 19038.87,
+      "latency_max_ms": 19212.71,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "status_codes": {
+        "200": 500
+      },
+      "ram_mb": 135.14,
+      "cpu_pct": 10.7
+    }
+  ],
+  "render_concurrency_benchmarks": [
+    {
+      "stage": "Render Concurrency - 5",
+      "concurrent_renders": 5,
+      "elapsed_seconds": 7.57,
+      "status_codes": {
+        "404": 5
+      }
+    },
+    {
+      "stage": "Render Concurrency - 10",
+      "concurrent_renders": 10,
+      "elapsed_seconds": 3.86,
+      "status_codes": {
+        "404": 10
+      }
+    },
+    {
+      "stage": "Render Concurrency - 25",
+      "concurrent_renders": 25,
+      "elapsed_seconds": 7.04,
+      "status_codes": {
+        "404": 25
+      }
+    },
+    {
+      "stage": "Render Concurrency - 50",
+      "concurrent_renders": 50,
+      "elapsed_seconds": 7.25,
+      "status_codes": {
+        "404": 50
+      }
+    }
+  ]
+}

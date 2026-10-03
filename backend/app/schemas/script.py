@@ -1,12 +1,13 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Optional, Any
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.models import ScriptStatus
+from app.core.config import settings
 
 
 class ScriptBase(BaseModel):
-    content: str
+    content: str = Field(..., max_length=settings.MAX_SCRIPT_LENGTH)
     language: str = "en"
 
 

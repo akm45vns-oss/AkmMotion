@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Text, Integer, Float, BigInteger, Boolean, DateTime,
     ForeignKey, Enum as SQLEnum, JSON
@@ -139,6 +139,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     style = Column(String(100), nullable=False, default="Explainer")
@@ -147,6 +148,7 @@ class Project(Base):
     thumbnail_url = Column(Text, nullable=True)
 
     user = relationship("User", back_populates="projects")
+    workspace = relationship("Workspace", backref="projects")
     script = relationship("Script", back_populates="project", uselist=False, cascade="all, delete-orphan")
     scenes = relationship("Scene", back_populates="project", cascade="all, delete-orphan")
     render_jobs = relationship("RenderJob", back_populates="project", cascade="all, delete-orphan")
@@ -238,7 +240,7 @@ class RenderJob(Base):
 
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    status = Column(pg_enum(RenderStatus, "render_status"), nullable=False, default=RenderStatus.pending)
+    status = Column(pg_enum(RenderStatus, "render_status"), nullable=False, default=RenderStatus.pending, index=True)
     progress = Column(Integer, nullable=False, default=0)
     celery_task_id = Column(String(255), nullable=True, index=True)
     started_at = Column(DateTime(timezone=True), nullable=True)
@@ -248,6 +250,7 @@ class RenderJob(Base):
     retry_count = Column(Integer, nullable=False, default=0)
 
     project = relationship("Project", back_populates="render_jobs")
+    video = relationship("Video", back_populates="render_job", uselist=False)
 
 
 # 9. Video
@@ -255,7 +258,7 @@ class Video(Base):
     __tablename__ = "videos"
 
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    render_job_id = Column(UUID(as_uuid=True), ForeignKey("render_jobs.id", ondelete="SET NULL"), nullable=True)
+    render_job_id = Column(UUID(as_uuid=True), ForeignKey("render_jobs.id", ondelete="SET NULL"), nullable=True, index=True)
     url = Column(Text, nullable=False)
     storage_path = Column(Text, nullable=False)
     duration = Column(Float, nullable=False)
@@ -265,6 +268,7 @@ class Video(Base):
     format = Column(String(10), nullable=False, default="mp4")
 
     project = relationship("Project", back_populates="videos")
+    render_job = relationship("RenderJob", back_populates="video")
 
 
 # 10. Image
@@ -327,4 +331,76 @@ class Export(Base):
 
 # 18. Character (CME canonical model)
 from app.models.character import DBCharacter as Character
+
+
+# 19. User Usage Tracking (Cost & Abuse Control)
+class UserUsage(Base):
+    __tablename__ = "user_usage"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    ai_requests_today = Column(Integer, nullable=False, default=0)
+    video_generations_today = Column(Integer, nullable=False, default=0)
+    render_jobs_today = Column(Integer, nullable=False, default=0)
+    rendered_seconds_total = Column(Float, nullable=False, default=0.0)
+    storage_bytes_total = Column(BigInteger, nullable=False, default=0)
+    estimated_cost_cents = Column(Integer, nullable=False, default=0)
+    last_reset_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", backref="usage")
+
+
+# 20. Refresh Token & Session Tracking (Session Hardening)
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    token_hash = Column(String(255), unique=True, nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    family_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    is_revoked = Column(Boolean, nullable=False, default=False)
+    device_info = Column(String(255), nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("User", backref="refresh_tokens")
+
+
+# 21. Enterprise RBAC / Workspaces
+class OrganizationRole(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    editor = "editor"
+    viewer = "viewer"
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    name = Column(String(255), nullable=False)
+    slug = Column(String(255), unique=True, nullable=False, index=True)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")
+    workspaces = relationship("Workspace", back_populates="organization", cascade="all, delete-orphan")
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    is_default = Column(Boolean, nullable=False, default=False)
+
+    organization = relationship("Organization", back_populates="workspaces")
+
+
+class OrganizationMember(Base):
+    __tablename__ = "organization_members"
+
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(50), nullable=False, default="editor")
+
+    organization = relationship("Organization", back_populates="members")
+    user = relationship("User", backref="organization_memberships")
+
 

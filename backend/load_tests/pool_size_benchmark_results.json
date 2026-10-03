@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-09-17T14:23:17Z",
+  "results": [
+    {
+      "pool_size": 5,
+      "max_overflow": 5,
+      "total_capacity": 10,
+      "concurrency": 50,
+      "total_requests": 1000,
+      "elapsed_seconds": 0.91,
+      "rps": 1102.15,
+      "latency_p50_ms": 30.44,
+      "latency_p95_ms": 112.04,
+      "latency_p99_ms": 164.07,
+      "queue_wait_p50_ms": 0.02,
+      "queue_wait_p95_ms": 0.06,
+      "error_count": 0,
+      "cpu_pct": 67.1,
+      "pool_status_at_end": "Pool size: 5  Connections in pool: 5 Current Overflow: 0 Current Checked out connections: 0"
+    },
+    {
+      "pool_size": 10,
+      "max_overflow": 10,
+      "total_capacity": 20,
+      "concurrency": 50,
+      "total_requests": 1000,
+      "elapsed_seconds": 1.0,
+      "rps": 997.53,
+      "latency_p50_ms": 30.53,
+      "latency_p95_ms": 114.76,
+      "latency_p99_ms": 169.04,
+      "queue_wait_p50_ms": 0.02,
+      "queue_wait_p95_ms": 0.07,
+      "error_count": 0,
+      "cpu_pct": 67.3,
+      "pool_status_at_end": "Pool size: 10  Connections in pool: 10 Current Overflow: 0 Current Checked out connections: 0"
+    },
+    {
+      "pool_size": 20,
+      "max_overflow": 20,
+      "total_capacity": 40,
+      "concurrency": 50,
+      "total_requests": 1000,
+      "elapsed_seconds": 1.1,
+      "rps": 904.99,
+      "latency_p50_ms": 21.52,
+      "latency_p95_ms": 148.05,
+      "latency_p99_ms": 286.89,
+      "queue_wait_p50_ms": 0.02,
+      "queue_wait_p95_ms": 0.07,
+      "error_count": 0,
+      "cpu_pct": 75.9,
+      "pool_status_at_end": "Pool size: 20  Connections in pool: 20 Current Overflow: 0 Current Checked out connections: 0"
+    },
+    {
+      "pool_size": 40,
+      "max_overflow": 20,
+      "total_capacity": 60,
+      "concurrency": 50,
+      "total_requests": 1000,
+      "elapsed_seconds": 1.16,
+      "rps": 863.93,
+      "latency_p50_ms": 29.89,
+      "latency_p95_ms": 161.64,
+      "latency_p99_ms": 252.33,
+      "queue_wait_p50_ms": 0.02,
+      "queue_wait_p95_ms": 0.08,
+      "error_count": 0,
+      "cpu_pct": 79.0,
+      "pool_status_at_end": "Pool size: 40  Connections in pool: 40 Current Overflow: 0 Current Checked out connections: 0"
+    }
+  ]
+}

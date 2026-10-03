@@ -3,6 +3,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload
 from app.models.models import RenderJob, Video, RenderStatus, Export, VideoQuality, ExportFormat
 
 
@@ -11,7 +12,7 @@ class RenderRepository:
         self.db = db
 
     async def get_by_id(self, job_id: UUID) -> Optional[RenderJob]:
-        query = select(RenderJob).where(RenderJob.id == job_id)
+        query = select(RenderJob).where(RenderJob.id == job_id).options(joinedload(RenderJob.video))
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
@@ -61,7 +62,73 @@ class RenderRepository:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def count_active_jobs_global(self) -> int:
+        from sqlalchemy import func
+        query = select(func.count(RenderJob.id)).where(
+            RenderJob.status.in_([RenderStatus.pending, RenderStatus.processing])
+        )
+        result = await self.db.execute(query)
+        return int(result.scalar() or 0)
+
+    async def count_active_jobs_for_user(self, user_id: UUID) -> int:
+        from sqlalchemy import func
+        query = select(func.count(RenderJob.id)).where(
+            RenderJob.user_id == user_id,
+            RenderJob.status.in_([RenderStatus.pending, RenderStatus.processing])
+        )
+        result = await self.db.execute(query)
+        return int(result.scalar() or 0)
+
+    async def count_queued_jobs_for_user(self, user_id: UUID) -> int:
+        from sqlalchemy import func
+        query = select(func.count(RenderJob.id)).where(
+            RenderJob.user_id == user_id,
+            RenderJob.status == RenderStatus.pending
+        )
+        result = await self.db.execute(query)
+        return int(result.scalar() or 0)
+
+    async def recover_abandoned_jobs(self, stale_timeout_seconds: int = 600) -> int:
+        """Sweeps database for jobs stuck in pending or processing beyond timeout and marks them failed."""
+        query = (
+            select(RenderJob)
+            .where(RenderJob.status.in_([RenderStatus.pending, RenderStatus.processing]))
+            .execution_options(populate_existing=True)
+        )
+        result = await self.db.execute(query)
+        stuck_jobs = list(result.scalars().all())
+        recovered_count = 0
+        now = datetime.now(timezone.utc)
+
+        for job in stuck_jobs:
+            check_time = job.updated_at or job.started_at or job.created_at
+            if check_time:
+                if check_time.tzinfo is None:
+                    check_time = check_time.replace(tzinfo=timezone.utc)
+                if (now - check_time).total_seconds() > stale_timeout_seconds:
+                    job.status = RenderStatus.failed
+                    job.completed_at = now
+                    job.error_message = "Render timed out or worker process was restarted. Please try again."
+                    recovered_count += 1
+
+        if recovered_count > 0:
+            await self.db.commit()
+        return recovered_count
+
+    async def cancel_job(self, job_id: UUID, user_id: UUID) -> Optional[RenderJob]:
+        job = await self.get_by_id(job_id)
+        if not job or job.user_id != user_id:
+            return None
+        if job.status in [RenderStatus.pending, RenderStatus.processing]:
+            job.status = RenderStatus.cancelled
+            job.completed_at = datetime.now(timezone.utc)
+            job.error_message = "Render cancelled by user."
+            await self.db.commit()
+            await self.db.refresh(job)
+        return job
+
     async def create_job(self, project_id: UUID, user_id: UUID, estimated_seconds: int = 15) -> RenderJob:
+
         job = RenderJob(
             project_id=project_id,
             user_id=user_id,

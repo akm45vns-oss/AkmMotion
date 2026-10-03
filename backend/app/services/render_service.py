@@ -40,7 +40,7 @@ class RenderService:
         if not project:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
-        # Concurrency protection: return existing active job if already queued or processing
+        # Concurrency protection: return existing active job if already queued or processing (idempotency)
         active_job = await self.repo.get_active_job(project_id, user_id)
         if active_job:
             resp = RenderJobResponse.model_validate(active_job)
@@ -49,17 +49,50 @@ class RenderService:
                 resp.video_url = video.url
             return resp
 
-        # Create new Render Job in DB
+        # Capacity Controls: Validate scene count limit
+        from sqlalchemy import func
+        scenes_count_res = await self.db.execute(
+            select(func.count(Scene.id)).where(Scene.project_id == project_id)
+        )
+        scene_count = int(scenes_count_res.scalar() or 0)
+        if scene_count > settings.MAX_SCENES_PER_RENDER:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Project contains {scene_count} scenes, which exceeds the maximum limit of {settings.MAX_SCENES_PER_RENDER}."
+            )
+
+        # Capacity Controls: Validate user concurrent render limit
+        user_active = await self.repo.count_active_jobs_for_user(user_id)
+        if user_active >= settings.MAX_CONCURRENT_RENDERS_PER_USER:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="You already have an active render job in progress. Please wait for it to finish."
+            )
+
+        # Capacity Controls: Validate global concurrent render limit
+        global_active = await self.repo.count_active_jobs_global()
+        if global_active >= settings.MAX_CONCURRENT_RENDERS_GLOBAL:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Rendering server capacity is currently full. Please try again shortly."
+            )
+
+        # Create new Render Job in DB (initially queued/pending)
         job = await self.repo.create_job(project_id=project_id, user_id=user_id, estimated_seconds=15)
 
-        # Dispatch background render execution
-        if background_tasks is not None:
-            background_tasks.add_task(self.execute_render_background, job.id, project_id, user_id)
-        else:
-            asyncio.create_task(self.execute_render_background(job.id, project_id, user_id))
+        # Dispatch via authoritative queue (Celery/Redis) with automatic fallback
+        from app.tasks.video_tasks import dispatch_render_job
+        dispatch_render_job(job.id, project_id, user_id, background_tasks)
 
         updated_job = await self.repo.get_by_id(job.id)
         return RenderJobResponse.model_validate(updated_job or job)
+
+    async def cancel_render_job(self, job_id: UUID, user_id: UUID) -> RenderJobResponse:
+        cancelled = await self.repo.cancel_job(job_id, user_id)
+        if not cancelled:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active render job not found.")
+        return RenderJobResponse.model_validate(cancelled)
+
 
     async def execute_render(self, job_id: UUID, project_id: UUID, user_id: UUID):
         """Direct execution wrapper for backward-compatibility."""
@@ -201,7 +234,10 @@ class RenderService:
                     job = await self.repo.get_by_id(job_id)
 
         resp = RenderJobResponse.model_validate(job)
-        video = await self.repo.get_video_by_job(job.id)
-        if video:
-            resp.video_url = video.url
+        if getattr(job, "video", None) and getattr(job.video, "url", None):
+            resp.video_url = job.video.url
+        else:
+            video = await self.repo.get_video_by_job(job.id)
+            if video:
+                resp.video_url = video.url
         return resp

@@ -34,6 +34,17 @@ async def get_render_status(
     return await service.get_job_status(job_id, current_user_id)
 
 
+@router.post("/cancel/{job_id}", response_model=RenderJobResponse)
+async def cancel_render(
+    job_id: UUID,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    service = RenderService(db)
+    return await service.cancel_render_job(job_id, UUID(current_user_id))
+
+
+
 @router.get("/video/{job_id}")
 async def get_render_video(
     job_id: UUID,

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.dependencies import get_db, get_current_user_id
 from app.core.rate_limit import (
     rate_limit_script_ai, rate_limit_tts, rate_limit_image_gen,
@@ -529,6 +530,12 @@ async def generate_scenes_from_script(
     if not script_text:
         return Response(status_code=400, content=b"script field required")
 
+    if len(script_text) > settings.MAX_SCRIPT_LENGTH:
+        return Response(
+            status_code=400,
+            content=f"Script exceeds maximum allowed length of {settings.MAX_SCRIPT_LENGTH} characters".encode()
+        )
+
     analyzer = ScriptAnalyzerService()
 
     # Detect if Groq manager is available
@@ -598,34 +605,64 @@ async def generate_scene_video(
     aspect_ratio = payload.get("aspect_ratio", "9:16")
     duration = str(payload.get("duration", "5"))
 
+    # Usage quota control: atomically reserve daily video generation limit with row-lock
+    from app.services.usage_service import UsageService
+    usage_svc = UsageService(db)
+    await usage_svc.reserve_video_generation(user_uuid)
+
+    from app.services.ai.providers import provider_manager
+    provider = provider_manager.get_provider()
+
     try:
-        queue_data = await fal_video_service.submit_text_to_video(
+        # Find scene image url for fallback
+        img_asset = next((a for a in scene.assets if a.asset_type.value == "image"), None)
+        img_url = img_asset.url if img_asset else None
+
+        queue_data = await provider.submit_job(
             prompt=prompt,
             aspect_ratio=aspect_ratio,
-            duration=duration
+            image_url=img_url
         )
     except Exception as e:
         safe_msg = sanitize_error(str(e))
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Video provider error: {safe_msg}")
+        # If upstream is credit-locked (403), seamlessly degrade to fallback provider
+        if "403" in str(e) or "balance" in str(e).lower() or "payment" in str(e).lower():
+            fallback_p = provider_manager.get_provider("fallback_ken_burns")
+            queue_data = await fallback_p.submit_job(prompt=prompt, aspect_ratio=aspect_ratio, image_url=img_url)
+            provider = fallback_p
+        else:
+            await usage_svc.release_video_generation(user_uuid)
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Video provider error: {safe_msg}")
 
     job = await video_repo.create_job(
         scene_id=scene.id,
         project_id=scene.project_id,
         user_id=user_uuid,
         prompt=prompt,
-        provider="fal.ai",
+        provider=provider.name,
         provider_request_id=queue_data.get("request_id"),
         status_url=queue_data.get("status_url"),
         response_url=queue_data.get("response_url"),
-        status=VideoGenerationStatus.in_queue.value
+        status=queue_data.get("status", VideoGenerationStatus.in_queue.value)
     )
 
     return {
         "job_id": str(job.id),
         "status": job.status,
         "scene_id": str(scene.id),
-        "provider": "fal.ai"
+        "provider": provider.name
     }
+
+
+@router.get("/providers/health")
+async def get_providers_health(current_user_id: str = Depends(get_current_user_id)):
+    """Returns real-time health and availability states of all AI generation providers."""
+    from app.services.ai.providers import provider_manager
+    return {
+        "status": "ok",
+        "providers": provider_manager.get_health_summary()
+    }
+
 
 
 @router.get("/video-jobs/{job_id}")

@@ -1,0 +1,85 @@
+{
+  "timestamp": "2026-09-18T09:39:18Z",
+  "render_tiers": [
+    {
+      "concurrency": 5,
+      "total_jobs": 5,
+      "elapsed_seconds": 9.11,
+      "successful_renders": 5,
+      "failed_renders": 0,
+      "failure_rate_pct": 0.0,
+      "avg_render_duration_s": 7.94,
+      "p50_render_duration_s": 7.97,
+      "p95_render_duration_s": 7.82,
+      "cpu_pct": 65.3,
+      "ram_mb": 67.18,
+      "verification": {
+        "all_1080x1920": true,
+        "aspect_ratio_9_16": true,
+        "all_h264": true,
+        "all_aac": true,
+        "all_script_fidelity_preserved": true
+      }
+    },
+    {
+      "concurrency": 10,
+      "total_jobs": 10,
+      "elapsed_seconds": 10.96,
+      "successful_renders": 10,
+      "failed_renders": 0,
+      "failure_rate_pct": 0.0,
+      "avg_render_duration_s": 9.74,
+      "p50_render_duration_s": 9.61,
+      "p95_render_duration_s": 9.58,
+      "cpu_pct": 94.5,
+      "ram_mb": 68.04,
+      "verification": {
+        "all_1080x1920": true,
+        "aspect_ratio_9_16": true,
+        "all_h264": true,
+        "all_aac": true,
+        "all_script_fidelity_preserved": true
+      }
+    },
+    {
+      "concurrency": 25,
+      "total_jobs": 25,
+      "elapsed_seconds": 26.48,
+      "successful_renders": 25,
+      "failed_renders": 0,
+      "failure_rate_pct": 0.0,
+      "avg_render_duration_s": 21.77,
+      "p50_render_duration_s": 23.35,
+      "p95_render_duration_s": 23.35,
+      "cpu_pct": 94.0,
+      "ram_mb": 17.79,
+      "verification": {
+        "all_1080x1920": true,
+        "aspect_ratio_9_16": true,
+        "all_h264": true,
+        "all_aac": true,
+        "all_script_fidelity_preserved": true
+      }
+    },
+    {
+      "concurrency": 50,
+      "total_jobs": 50,
+      "elapsed_seconds": 68.77,
+      "successful_renders": 50,
+      "failed_renders": 0,
+      "failure_rate_pct": 0.0,
+      "avg_render_duration_s": 51.84,
+      "p50_render_duration_s": 51.24,
+      "p95_render_duration_s": 32.43,
+      "cpu_pct": 91.9,
+      "ram_mb": 13.04,
+      "verification": {
+        "all_1080x1920": true,
+        "aspect_ratio_9_16": true,
+        "all_h264": true,
+        "all_aac": true,
+        "all_script_fidelity_preserved": true
+      }
+    }
+  ]
+}

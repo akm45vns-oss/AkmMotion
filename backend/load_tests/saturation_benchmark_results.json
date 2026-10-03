@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-09-18T09:56:05Z",
+  "last_healthy_concurrency": 200,
+  "first_saturated_concurrency": 100,
+  "cause_of_saturation": "High error rate: 10.0% >= 1.0%",
+  "steps": [
+    {
+      "concurrency": 100,
+      "total_requests": 400,
+      "elapsed_seconds": 20.44,
+      "rps": 19.57,
+      "p50_ms": 2306.9,
+      "p95_ms": 12678.8,
+      "p99_ms": 13867.79,
+      "error_count": 40,
+      "error_rate_pct": 10.0,
+      "cpu_pct": 71.1,
+      "ram_mb": 144.64,
+      "is_saturated": true,
+      "saturation_reason": "High error rate: 10.0% >= 1.0%",
+      "status_codes": {
+        "200": 360,
+        "503": 14
+      }
+    },
+    {
+      "concurrency": 150,
+      "total_requests": 600,
+      "elapsed_seconds": 5.43,
+      "rps": 110.57,
+      "p50_ms": 381.15,
+      "p95_ms": 2264.51,
+      "p99_ms": 4893.24,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "cpu_pct": 57.7,
+      "ram_mb": 152.19,
+      "is_saturated": false,
+      "saturation_reason": "healthy",
+      "status_codes": {
+        "200": 600
+      }
+    },
+    {
+      "concurrency": 200,
+      "total_requests": 800,
+      "elapsed_seconds": 5.66,
+      "rps": 141.24,
+      "p50_ms": 343.62,
+      "p95_ms": 1978.38,
+      "p99_ms": 4869.29,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "cpu_pct": 53.4,
+      "ram_mb": 172.2,
+      "is_saturated": false,
+      "saturation_reason": "healthy",
+      "status_codes": {
+        "200": 800
+      }
+    },
+    {
+      "concurrency": 250,
+      "total_requests": 1000,
+      "elapsed_seconds": 15.88,
+      "rps": 62.99,
+      "p50_ms": 754.75,
+      "p95_ms": 2624.22,
+      "p99_ms": 14709.11,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "cpu_pct": 49.9,
+      "ram_mb": 167.43,
+      "is_saturated": true,
+      "saturation_reason": "Latency SLA breach: p95 2624.22ms >= 2,500ms",
+      "status_codes": {
+        "200": 1000
+      }
+    },
+    {
+      "concurrency": 300,
+      "total_requests": 1200,
+      "elapsed_seconds": 6.48,
+      "rps": 185.12,
+      "p50_ms": 611.38,
+      "p95_ms": 3107.4,
+      "p99_ms": 5168.68,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "cpu_pct": 65.9,
+      "ram_mb": 183.47,
+      "is_saturated": true,
+      "saturation_reason": "Latency SLA breach: p95 3107.4ms >= 2,500ms",
+      "status_codes": {
+        "200": 1200
+      }
+    },
+    {
+      "concurrency": 400,
+      "total_requests": 1600,
+      "elapsed_seconds": 6.73,
+      "rps": 237.89,
+      "p50_ms": 658.84,
+      "p95_ms": 4209.81,
+      "p99_ms": 5562.84,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "cpu_pct": 61.3,
+      "ram_mb": 193.33,
+      "is_saturated": true,
+      "saturation_reason": "Latency SLA breach: p95 4209.81ms >= 2,500ms",
+      "status_codes": {
+        "200": 1600
+      }
+    }
+  ]
+}

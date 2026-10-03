@@ -32,56 +32,75 @@ export default function RenderModal({ projectId, onClose }: RenderModalProps) {
     (jobId: string) => {
       cleanupPolling();
       let attempts = 0;
-      const MAX_ATTEMPTS = 180; // 4.5 minutes maximum polling timeout
+      const MAX_ATTEMPTS = 120; // Up to 5+ minutes total polling timeout
+      isCancelledRef.current = false;
 
-      pollIntervalRef.current = setInterval(async () => {
-        if (isCancelledRef.current) {
-          cleanupPolling();
-          return;
+      const scheduleNextPoll = () => {
+        if (isCancelledRef.current) return;
+
+        // Adaptive polling backoff: start fast, back off to conserve server resources
+        // 0-10 attempts: 2000ms
+        // 11-30 attempts: 3000ms
+        // 31+ attempts: 4000ms
+        let delayMs = 2000;
+        if (attempts > 30) {
+          delayMs = 4000;
+        } else if (attempts > 10) {
+          delayMs = 3000;
         }
 
-        attempts += 1;
-        if (attempts > MAX_ATTEMPTS) {
-          cleanupPolling();
-          setErrorMsg("Rendering is taking longer than expected. Please check your project dashboard.");
-          setPhase("error");
-          return;
-        }
+        pollIntervalRef.current = setTimeout(async () => {
+          if (isCancelledRef.current) return;
+          attempts += 1;
 
-        try {
-          const job = await renderApi.getStatus(jobId);
-          setCurrentJob(job);
+          if (attempts > MAX_ATTEMPTS) {
+            cleanupPolling();
+            setErrorMsg("Rendering is taking longer than expected. Please check your project dashboard.");
+            setPhase("error");
+            return;
+          }
 
-          if (job.status === "processing" || job.status === "pending") {
-            setProgress(job.progress || 10);
-            if (job.progress < 20) {
-              setStatusText("Preparing visual scenes & audio narration...");
-            } else if (job.progress < 70) {
-              setStatusText(`Rendering 9:16 vertical MP4 video (${job.progress}%)...`);
-            } else {
-              setStatusText("Stitching scenes & finalizing H.264 MP4 encode...");
+          try {
+            const job = await renderApi.getStatus(jobId);
+            if (isCancelledRef.current) return;
+            setCurrentJob(job);
+
+            if (job.status === "processing" || job.status === "pending") {
+              setProgress(job.progress || 10);
+              if (job.progress < 20) {
+                setStatusText("Preparing visual scenes & audio narration...");
+              } else if (job.progress < 70) {
+                setStatusText(`Rendering 9:16 vertical MP4 video (${job.progress}%)...`);
+              } else {
+                setStatusText("Stitching scenes & finalizing H.264 MP4 encode...");
+              }
+              scheduleNextPoll();
+            } else if (job.status === "completed") {
+              cleanupPolling();
+              setProgress(100);
+              setStatusText("Video successfully rendered!");
+              const finalUrl = job.video_url || renderApi.getVideoUrl(job.id);
+              setDownloadUrl(finalUrl);
+              setPhase("done");
+            } else if (job.status === "failed") {
+              cleanupPolling();
+              setPhase("error");
+              setErrorMsg(job.error_message || "Video rendering failed. Please try again.");
             }
-          } else if (job.status === "completed") {
-            cleanupPolling();
-            setProgress(100);
-            setStatusText("Video successfully rendered!");
-            const finalUrl = job.video_url || renderApi.getVideoUrl(job.id);
-            setDownloadUrl(finalUrl);
-            setPhase("done");
-          } else if (job.status === "failed") {
-            cleanupPolling();
-            setPhase("error");
-            setErrorMsg(job.error_message || "Video rendering failed. Please try again.");
+          } catch (err: any) {
+            console.error("Failed to poll render status:", err);
+            if (attempts > 8 && !currentJob) {
+              cleanupPolling();
+              setPhase("error");
+              setErrorMsg("Network error checking render status. Please retry.");
+            } else {
+              scheduleNextPoll();
+            }
           }
-        } catch (err: any) {
-          console.error("Failed to poll render status:", err);
-          if (attempts > 5 && !currentJob) {
-            cleanupPolling();
-            setPhase("error");
-            setErrorMsg("Network error checking render status. Please retry.");
-          }
-        }
-      }, 1500);
+        }, delayMs);
+      };
+
+      scheduleNextPoll();
     },
     [cleanupPolling, currentJob]
   );

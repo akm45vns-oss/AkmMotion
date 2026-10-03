@@ -1,9 +1,10 @@
-﻿version: "3.8"
+version: "3.8"
 
 services:
   redis:
     image: redis:7-alpine
     container_name: akmmotion_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
@@ -15,6 +16,7 @@ services:
   postgres_local:
     image: postgres:15-alpine
     container_name: akmmotion_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespassword
@@ -23,6 +25,58 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: akmmotion_backend_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - storage_data:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: akmmotion_backend_worker
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info -c 2
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_TASK_ALWAYS_EAGER=false
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - storage_data:/app/storage
 
 volumes:
   postgres_data:
+  storage_data:
+

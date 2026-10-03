@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.models.models import ProjectStatus
 from app.schemas.script import ScriptResponse
+from app.core.config import settings
 
 
 class ProjectBase(BaseModel):
@@ -12,11 +13,12 @@ class ProjectBase(BaseModel):
     description: Optional[str] = None
     style: str = "Explainer"
     language: str = "en"
+    workspace_id: Optional[UUID] = None
 
 
 class ProjectCreate(ProjectBase):
     model_config = ConfigDict(extra="forbid")
-    script_content: Optional[str] = None
+    script_content: Optional[str] = Field(None, max_length=settings.MAX_SCRIPT_LENGTH)
 
 
 class ProjectUpdate(BaseModel):
@@ -27,6 +29,7 @@ class ProjectUpdate(BaseModel):
     language: Optional[str] = None
     status: Optional[ProjectStatus] = None
     thumbnail_url: Optional[str] = None
+    workspace_id: Optional[UUID] = None
 
 
 class ProjectResponse(ProjectBase):
@@ -34,6 +37,7 @@ class ProjectResponse(ProjectBase):
 
     id: UUID
     user_id: UUID
+    workspace_id: Optional[UUID] = None
     status: ProjectStatus
     thumbnail_url: Optional[str] = None
     created_at: datetime
@@ -53,6 +57,7 @@ class ProjectResponse(ProjectBase):
         return cls(
             id=project.id,
             user_id=project.user_id,
+            workspace_id=getattr(project, "workspace_id", None),
             title=project.title,
             description=project.description,
             style=project.style,

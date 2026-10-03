@@ -1,4 +1,4 @@
-﻿from typing import Optional, List
+from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -45,8 +45,18 @@ class SceneRepository:
         await self.db.commit()
 
     async def reorder(self, items: List[tuple[UUID, int]], user_id: Optional[UUID] = None) -> None:
-        for scene_id, new_number in items:
-            scene = await self.get_by_id(scene_id, user_id)
-            if scene:
-                scene.scene_number = new_number
+        if not items or not user_id:
+            return
+        scene_ids = [s_id for s_id, _ in items]
+        id_to_num = dict(items)
+        query = (
+            select(Scene)
+            .join(Project, Scene.project_id == Project.id)
+            .where(Scene.id.in_(scene_ids), Project.user_id == user_id)
+        )
+        result = await self.db.execute(query)
+        scenes = result.scalars().all()
+        for scene in scenes:
+            if scene.id in id_to_num:
+                scene.scene_number = id_to_num[scene.id]
         await self.db.commit()

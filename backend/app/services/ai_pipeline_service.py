@@ -91,6 +91,8 @@ class AIPipelineService:
             style=project_style,
             language=project_lang
         )
+        if len(raw_scenes) > settings.MAX_SCENES_PER_PROJECT:
+            raw_scenes = raw_scenes[:settings.MAX_SCENES_PER_PROJECT]
 
         # Delete existing scenes if any
         # Re-fetch project to ensure clean session state

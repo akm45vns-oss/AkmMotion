@@ -34,30 +34,31 @@ export default function AuthSessionWatcher() {
 
     // Tab visibility switch handler (defense against unattended session hijacking)
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab went to background
-        sessionStorage.setItem("akm_tab_hidden_at", Date.now().toString());
-      } else {
-        const hiddenAt = sessionStorage.getItem("akm_tab_hidden_at");
-        if (hiddenAt) {
-          const elapsed = Date.now() - parseInt(hiddenAt, 10);
-          if (elapsed > INACTIVITY_TIMEOUT_MS) {
-            console.warn("[Security] Session expired while tab was in background.");
-            logout();
-            router.push("/login?reason=session_expired");
-          }
-          sessionStorage.removeItem("akm_tab_hidden_at");
-        }
+      if (document.hidden || document.visibilityState === "hidden") {
+        console.warn("[Security] Tab switched away / hidden. Immediately terminating authenticated session.");
+        logout();
+        sessionStorage.clear();
+        router.push("/login?reason=tab_hidden");
+      }
+    };
+
+    // Cross-tab synchronization: If user logs out in another tab, log out here immediately
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "akmmotion_jwt_token" && !e.newValue) {
+        logout();
+        router.push("/login?reason=logged_out_elsewhere");
       }
     };
 
     // User activity listeners
-    const activityEvents = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
+    const activityEvents = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"];
     activityEvents.forEach((ev) => {
       window.addEventListener(ev, resetInactivityTimer, { passive: true });
     });
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handleVisibilityChange);
+    window.addEventListener("storage", handleStorageChange);
 
     // Initialize timer
     resetInactivityTimer();
@@ -70,6 +71,8 @@ export default function AuthSessionWatcher() {
         window.removeEventListener(ev, resetInactivityTimer);
       });
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handleVisibilityChange);
+      window.removeEventListener("storage", handleStorageChange);
     };
   }, [isAuthenticated, token, logout, router]);
 

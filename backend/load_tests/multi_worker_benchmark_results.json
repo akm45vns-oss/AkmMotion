@@ -1,0 +1,53 @@
+{
+  "timestamp": "2026-09-17T14:31:40Z",
+  "results": [
+    {
+      "workers": 1,
+      "concurrency": 50,
+      "total_requests": 200,
+      "rps": 11.41,
+      "p50_ms": 468.49,
+      "p95_ms": 14121.01,
+      "p99_ms": 15586.69,
+      "cpu_pct": 29.8,
+      "ram_mb": 130.68,
+      "errors": 0
+    },
+    {
+      "workers": 2,
+      "concurrency": 50,
+      "total_requests": 200,
+      "rps": 10.41,
+      "p50_ms": 201.76,
+      "p95_ms": 15192.15,
+      "p99_ms": 18022.45,
+      "cpu_pct": 31.9,
+      "ram_mb": 332.51,
+      "errors": 0
+    },
+    {
+      "workers": 4,
+      "concurrency": 50,
+      "total_requests": 200,
+      "rps": 10.71,
+      "p50_ms": 133.58,
+      "p95_ms": 14959.0,
+      "p99_ms": 17476.15,
+      "cpu_pct": 26.3,
+      "ram_mb": 557.71,
+      "errors": 0
+    },
+    {
+      "workers": 8,
+      "concurrency": 50,
+      "total_requests": 200,
+      "rps": 11.36,
+      "p50_ms": 97.21,
+      "p95_ms": 13961.6,
+      "p99_ms": 16520.06,
+      "cpu_pct": 24.0,
+      "ram_mb": 1010.17,
+      "errors": 0
+    }
+  ]
+}

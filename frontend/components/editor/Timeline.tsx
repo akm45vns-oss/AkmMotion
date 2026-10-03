@@ -1,16 +1,20 @@
 "use client";
 
+import React, { memo, useCallback } from "react";
 import { useEditorStore } from "@/lib/stores/editorStore";
 import { Layers, Clock } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api/client";
 
-export default function Timeline() {
-  const { scenes, activeSceneIndex, activeSceneId, setActiveSceneId, setActiveSceneIndex } = useEditorStore();
+interface SceneCardProps {
+  scene: any;
+  index: number;
+  isActive: boolean;
+  onSelect: (index: number, id: string) => void;
+}
 
-  const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
-
-  const getSceneImageUrl = (scene: any) => {
-    const imageAsset = scene?.assets?.find((a: any) => a.asset_type === "image");
+const SceneCard = memo(function SceneCard({ scene, index, isActive, onSelect }: SceneCardProps) {
+  const getSceneImageUrl = (sc: any) => {
+    const imageAsset = sc?.assets?.find((a: any) => a.asset_type === "image");
     let storedUrl = imageAsset?.url || "";
     if (storedUrl) {
       if (storedUrl.includes("pollinations.ai")) {
@@ -22,13 +26,70 @@ export default function Timeline() {
       return storedUrl;
     }
 
-    const rawPrompt = (scene?.image_prompt || scene?.narration || scene?.subtitle || "").replace(/\*\*/g, "").trim();
-    const promptText = rawPrompt || `Indian story scene ${scene?.scene_number || 1}`;
+    const rawPrompt = (sc?.image_prompt || sc?.narration || sc?.subtitle || "").replace(/\*\*/g, "").trim();
+    const promptText = rawPrompt || `Indian story scene ${sc?.scene_number || 1}`;
     
     const encodedPrompt = encodeURIComponent(`photorealistic 8k render, ${promptText}, 9:16 vertical aspect ratio, cinematic lighting, ultra detailed`);
-    const seed = ((scene?.scene_number || 1) * 73 + 1234) % 99999;
+    const seed = ((sc?.scene_number || 1) * 73 + 1234) % 99999;
     return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=768&height=1344&model=flux-realism&nologo=true&seed=${seed}`;
   };
+
+  const imageUrl = getSceneImageUrl(scene);
+
+  return (
+    <div
+      onClick={() => onSelect(index, scene.id)}
+      className={`flex-shrink-0 w-32 sm:w-36 h-24 rounded-md border cursor-pointer relative overflow-hidden transition-all group ${
+        isActive
+          ? "border-[#E76536] ring-1 ring-[#E76536] shadow-md shadow-[#E76536]/15 scale-[1.02]"
+          : "border-[#292A29] hover:border-[#383938] bg-[#0D0E0E]"
+      }`}
+    >
+      {/* Background Scene Image */}
+      <img
+        src={imageUrl}
+        alt=""
+        loading="lazy"
+        onError={(e) => {
+          if (!e.currentTarget.src.includes("/ai/image-proxy") && imageUrl.startsWith("http")) {
+            e.currentTarget.src = `${API_BASE_URL}/ai/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+          }
+        }}
+        className="w-full h-full object-cover opacity-75 group-hover:opacity-90 transition-opacity"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60" />
+
+      {/* Scene Number Badge */}
+      <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/85 text-[10px] font-bold text-[#F5F1E8] border border-white/10 font-mono">
+        #{scene.scene_number}
+      </div>
+
+      {/* Duration Badge */}
+      <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#151616]/90 text-[10px] font-medium text-[#A9A49B] border border-[#292A29] font-mono">
+        {scene.duration || 5}s
+      </div>
+
+      {/* Narration Preview */}
+      <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-[#F5F1E8]/90 line-clamp-1 font-medium">
+        {(scene.narration || "").replace(/\*\*/g, "")}
+      </div>
+    </div>
+  );
+});
+
+export default function Timeline() {
+  const scenes = useEditorStore((state) => state.scenes);
+  const activeSceneIndex = useEditorStore((state) => state.activeSceneIndex);
+  const activeSceneId = useEditorStore((state) => state.activeSceneId);
+  const setActiveSceneId = useEditorStore((state) => state.setActiveSceneId);
+  const setActiveSceneIndex = useEditorStore((state) => state.setActiveSceneIndex);
+
+  const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
+
+  const handleSelect = useCallback((index: number, id: string) => {
+    setActiveSceneIndex(index);
+    setActiveSceneId(id);
+  }, [setActiveSceneIndex, setActiveSceneId]);
 
   return (
     <div className="h-40 border-t border-[#292A29] bg-[#151616] flex flex-col justify-between p-3 sm:p-4 select-none">
@@ -48,51 +109,14 @@ export default function Timeline() {
       <div className="flex-1 flex items-center gap-2.5 overflow-x-auto py-1 scrollbar-thin">
         {scenes.map((scene, index) => {
           const isActive = index === activeSceneIndex || scene.id === activeSceneId;
-          const imageUrl = getSceneImageUrl(scene);
-
-          const handleSelect = () => {
-            setActiveSceneIndex(index);
-            setActiveSceneId(scene.id);
-          };
-
           return (
-            <div
+            <SceneCard
               key={scene.id || index}
-              onClick={handleSelect}
-              className={`flex-shrink-0 w-32 sm:w-36 h-24 rounded-md border cursor-pointer relative overflow-hidden transition-all group ${
-                isActive
-                  ? "border-[#E76536] ring-1 ring-[#E76536] shadow-md shadow-[#E76536]/15 scale-[1.02]"
-                  : "border-[#292A29] hover:border-[#383938] bg-[#0D0E0E]"
-              }`}
-            >
-              {/* Background Scene Image */}
-              <img
-                src={imageUrl}
-                alt=""
-                onError={(e) => {
-                  if (!e.currentTarget.src.includes("/ai/image-proxy") && imageUrl.startsWith("http")) {
-                    e.currentTarget.src = `${API_BASE_URL}/ai/image-proxy?url=${encodeURIComponent(imageUrl)}`;
-                  }
-                }}
-                className="w-full h-full object-cover opacity-75 group-hover:opacity-90 transition-opacity"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/60" />
-
-              {/* Scene Number Badge */}
-              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/85 text-[10px] font-bold text-[#F5F1E8] border border-white/10 font-mono">
-                #{scene.scene_number}
-              </div>
-
-              {/* Duration Badge */}
-              <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#151616]/90 text-[10px] font-medium text-[#A9A49B] border border-[#292A29] font-mono">
-                {scene.duration || 5}s
-              </div>
-
-              {/* Narration Preview */}
-              <div className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-[#F5F1E8]/90 line-clamp-1 font-medium">
-                {(scene.narration || "").replace(/\*\*/g, "")}
-              </div>
-            </div>
+              scene={scene}
+              index={index}
+              isActive={isActive}
+              onSelect={handleSelect}
+            />
           );
         })}
       </div>

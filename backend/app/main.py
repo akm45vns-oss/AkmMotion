@@ -7,10 +7,18 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
-from fastapi import FastAPI
+import time
+import uuid
+import logging
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.router import api_router
+
+logger = logging.getLogger("akmmotion.access")
 
 is_prod = settings.ENVIRONMENT.lower() in ["production", "prod"]
 show_docs = not is_prod or settings.ENABLE_API_DOCS
@@ -22,6 +30,33 @@ app = FastAPI(
     docs_url="/docs" if show_docs else None,
     redoc_url="/redoc" if show_docs else None
 )
+
+# Structured Request Logging & Request-ID Middleware
+@app.middleware("http")
+async def structured_logging_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+    
+    response.headers["X-Request-ID"] = request_id
+    
+    # Sanitize path to avoid leaking sensitive query params
+    client_ip = request.client.host if request.client else "unknown"
+    logger.info(
+        f'{{"request_id": "{request_id}", "method": "{request.method}", "path": "{request.url.path}", "status": {response.status_code}, "duration_ms": {duration_ms}, "ip": "{client_ip}"}}'
+    )
+
+    # Record Prometheus metrics
+    try:
+        from app.core.metrics import record_http_request
+        record_http_request(request.method, request.url.path, response.status_code, duration_ms / 1000.0)
+    except Exception:
+        pass
+
+    return response
 
 # Global Security Headers Middleware
 @app.middleware("http")
@@ -70,6 +105,9 @@ for _o in settings.cors_origins:
     if _o not in _cors_origins:
         _cors_origins.append(_o)
 
+from app.core.profiler import PerformanceProfilingMiddleware
+
+app.add_middleware(PerformanceProfilingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -130,7 +168,117 @@ async def root():
     return {
         "message": "Welcome to AkmMotion AI Video SaaS API",
         "docs": "/docs",
-        "health": "/api/v1/health"
+        "health": "/health/live",
+        "ready": "/health/ready",
+        "metrics": "/metrics"
+    }
+
+
+@app.get("/metrics", tags=["Observability"])
+async def prometheus_metrics():
+    """Prometheus metrics endpoint for production monitoring and scraping."""
+    from app.core.metrics import render_prometheus_metrics
+    return Response(
+        content=render_prometheus_metrics(),
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
+@app.get("/health/live", tags=["Health"])
+async def liveness_probe():
+    """Kubernetes / Render shallow liveness probe."""
+    return {
+        "status": "alive",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_probe():
+    """Readiness probe checking database, redis, and storage dependencies."""
+    checks = {}
+    is_ready = True
+
+    # 1. Database check
+    try:
+        from app.db.session import AsyncSessionLocal
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = {"status": "healthy"}
+    except Exception as e:
+        checks["database"] = {"status": "unhealthy", "error": "Database connection failed"}
+        is_ready = False
+
+    # 2. Redis check
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.REDIS_URL, socket_timeout=1.0)
+        await r.ping()
+        await r.aclose()
+        checks["redis"] = {"status": "healthy"}
+    except Exception:
+        # Non-fatal because background task fallback is automatically active
+        checks["redis"] = {"status": "degraded", "fallback": "background_tasks_active"}
+
+    # 3. Storage check
+    try:
+        from app.services.storage_service import storage_service
+        import os
+        if settings.LOCAL_STORAGE:
+            writable = os.access(storage_service.local_dir, os.W_OK)
+            checks["storage"] = {"status": "healthy" if writable else "degraded", "type": "local"}
+        else:
+            checks["storage"] = {"status": "configured", "type": "cloud"}
+    except Exception as e:
+        checks["storage"] = {"status": "degraded", "error": str(e)}
+
+    # 4. AI Provider health
+    try:
+        from app.services.ai.providers.provider_manager import provider_manager
+        checks["ai_providers"] = provider_manager.get_health_summary()
+    except Exception:
+        checks["ai_providers"] = {"status": "unknown"}
+
+    overall_status = "ready" if is_ready else "not_ready"
+    status_code = 200 if is_ready else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": overall_status,
+            "checks": checks,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    )
+
+
+@app.get("/health/stats", tags=["Health"])
+async def health_stats():
+    """Observability stats: capacity, queue depth, providers, and storage usage."""
+    from app.services.storage_service import storage_service
+    from app.services.ai.providers.provider_manager import provider_manager
+    from app.db.session import AsyncSessionLocal
+    from app.repositories.render_repo import RenderRepository
+
+    active_renders = 0
+    try:
+        async with AsyncSessionLocal() as db:
+            repo = RenderRepository(db)
+            active_renders = await repo.count_active_jobs_global()
+    except Exception:
+        pass
+
+    return {
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+        "active_global_renders": active_renders,
+        "max_concurrent_renders": settings.MAX_CONCURRENT_RENDERS_GLOBAL,
+        "storage": storage_service.calculate_storage_usage(),
+        "providers": provider_manager.get_health_summary(),
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 

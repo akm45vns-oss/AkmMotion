@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-09-17T14:21:57Z",
+  "development_topology": {
+    "name": "Remote Neon Serverless Pooler (AWS US-East-2 Ohio from India Host)",
+    "telemetry": {
+      "host": "ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech",
+      "port": 5432,
+      "tcp_latency": {
+        "p50_ms": 293.94,
+        "p95_ms": 317.16,
+        "min_ms": 272.81,
+        "max_ms": 317.16,
+        "samples": 10
+      },
+      "connection_establishment": {
+        "p50_ms": 1732.36,
+        "p95_ms": 1828.33,
+        "min_ms": 1669.23,
+        "max_ms": 1828.33,
+        "samples": 10
+      },
+      "simple_query_select_1": {
+        "p50_ms": 563.63,
+        "p95_ms": 708.28,
+        "min_ms": 548.04,
+        "max_ms": 708.28,
+        "samples": 10
+      },
+      "representative_select": {
+        "p50_ms": 572.15,
+        "p95_ms": 718.78,
+        "min_ms": 547.95,
+        "max_ms": 718.78,
+        "samples": 10
+      },
+      "representative_join": {
+        "p50_ms": 567.83,
+        "p95_ms": 596.22,
+        "min_ms": 544.71,
+        "max_ms": 596.22,
+        "samples": 10
+      },
+      "transaction_latency": {
+        "p50_ms": 836.02,
+        "p95_ms": 895.28,
+        "min_ms": 821.91,
+        "max_ms": 895.28,
+        "samples": 10
+      }
+    }
+  },
+  "production_colocated_topology": {
+    "name": "Colocated PostgreSQL 16 on Loopback (127.0.0.1:5432)",
+    "telemetry": {
+      "host": "127.0.0.1",
+      "port": 5432,
+      "tcp_latency": {
+        "p50_ms": 14.78,
+        "p95_ms": 16.01,
+        "min_ms": 0.3,
+        "max_ms": 16.01,
+        "samples": 15
+      },
+      "connection_establishment": {
+        "p50_ms": 31.61,
+        "p95_ms": 45.5,
+        "min_ms": 26.65,
+        "max_ms": 45.5,
+        "samples": 15
+      },
+      "simple_query_select_1": {
+        "p50_ms": 1.06,
+        "p95_ms": 2.47,
+        "min_ms": 0.58,
+        "max_ms": 2.47,
+        "samples": 15
+      },
+      "representative_select": {
+        "p50_ms": 4.23,
+        "p95_ms": 7.92,
+        "min_ms": 2.95,
+        "max_ms": 7.92,
+        "samples": 15
+      },
+      "representative_join": {
+        "p50_ms": 4.33,
+        "p95_ms": 8.14,
+        "min_ms": 2.54,
+        "max_ms": 8.14,
+        "samples": 15
+      },
+      "transaction_latency": {
+        "p50_ms": 0.57,
+        "p95_ms": 0.91,
+        "min_ms": 0.35,
+        "max_ms": 0.91,
+        "samples": 15
+      }
+    }
+  }
+}
