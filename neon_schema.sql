@@ -24,6 +24,7 @@ CREATE TYPE export_format_enum AS ENUM ('mp4', 'webm');
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
+    hashed_password VARCHAR(255),
     full_name VARCHAR(255) NOT NULL,
     avatar_url TEXT,
     auth_provider user_auth_provider NOT NULL DEFAULT 'email',

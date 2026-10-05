@@ -20,10 +20,17 @@ class UserRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def create(self, email: str, full_name: str, auth_provider: AuthProvider = AuthProvider.email) -> User:
+    async def create(
+        self,
+        email: str,
+        full_name: str,
+        hashed_password: Optional[str] = None,
+        auth_provider: AuthProvider = AuthProvider.email
+    ) -> User:
         user = User(
             email=email.lower().strip(),
             full_name=full_name,
+            hashed_password=hashed_password,
             auth_provider=auth_provider,
             is_active=True,
             is_verified=True

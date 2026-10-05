@@ -81,6 +81,8 @@ class SubtitleGeneratorService:
                 "word":  word,
                 "start": round(current_time, 3),
                 "end":   end_time,
+                "start_ms": int(round(current_time * 1000)),
+                "end_ms":   int(round(end_time * 1000)),
                 "index": i
             })
             current_time = end_time
@@ -90,8 +92,8 @@ class SubtitleGeneratorService:
     @staticmethod
     def compute_word_timings_from_text(text: str, total_duration: float) -> List[Dict[str, Any]]:
         """
-        Synchronous helper — same logic, usable without async context.
-        Returns list of {word, start, end, index}.
+        Synchronous helper — canonical representation with start_ms and end_ms.
+        Returns list of {word, start, end, start_ms, end_ms, index}.
         """
         words = text.split()
         if not words or total_duration <= 0:
@@ -115,7 +117,14 @@ class SubtitleGeneratorService:
         for i, word in enumerate(words):
             w_dur = round((weights[i] / total_weight) * available, 3)
             end_t = round(current_time + w_dur, 3)
-            result.append({"word": word, "start": round(current_time, 3), "end": end_t, "index": i})
+            result.append({
+                "word": word,
+                "start": round(current_time, 3),
+                "end": end_t,
+                "start_ms": int(round(current_time * 1000)),
+                "end_ms": int(round(end_t * 1000)),
+                "index": i
+            })
             current_time = end_t
 
         return result

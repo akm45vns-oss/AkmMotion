@@ -124,6 +124,7 @@ class User(Base):
     __tablename__ = "users"
 
     email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=True)
     full_name = Column(String(255), nullable=False)
     avatar_url = Column(Text, nullable=True)
     auth_provider = Column(pg_enum(AuthProvider, "user_auth_provider"), nullable=False, default=AuthProvider.email)

@@ -22,8 +22,9 @@ class Settings(BaseSettings):
         return [p.strip() for p in self.TRUSTED_PROXIES.split(",") if p.strip()]
 
     # Neon PostgreSQL Database
-    DATABASE_URL: str = "postgresql+asyncpg://neondb_owner:npg_pYKgFxNOA25E@ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech/neondb?ssl=require"
-    SYNC_DATABASE_URL: str = "postgresql://neondb_owner:npg_pYKgFxNOA25E@ep-wispy-waterfall-ay9ni5ea-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    # REQUIRED: Set in .env — never hardcode credentials here.
+    DATABASE_URL: str = ""
+    SYNC_DATABASE_URL: str = ""
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
@@ -37,7 +38,9 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = "akmmotion-storage"
 
     # JWT Authentication
-    JWT_SECRET: str = "super-secret-jwt-key-change-in-production-min-32-chars"
+    # REQUIRED: Must be a cryptographically random string of at least 32 characters.
+    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(48))"
+    JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 1440  # Backward-compatible default
     JWT_ACCESS_EXPIRE_MINUTES: int = 15
@@ -112,6 +115,25 @@ class Settings(BaseSettings):
             path = os.path.join(base_dir, "storage", "videos")
         os.makedirs(path, exist_ok=True)
         return path
+
+    @property
+    def validate_required_secrets(self) -> None:
+        """
+        Call at application startup to enforce that critical secrets are set.
+        Raises RuntimeError immediately if any required secret is missing or insecure.
+        """
+        errors = []
+        if not self.DATABASE_URL:
+            errors.append("DATABASE_URL is not set. Set it in .env or environment variables.")
+        if not self.JWT_SECRET:
+            errors.append("JWT_SECRET is not set. Generate with: python -c \"import secrets; print(secrets.token_urlsafe(48))\"")
+        elif len(self.JWT_SECRET) < 32:
+            errors.append(f"JWT_SECRET is too short ({len(self.JWT_SECRET)} chars). Minimum 32 characters required.")
+        if errors:
+            raise RuntimeError(
+                "[AkmMotion] FATAL: Required secrets are missing or insecure.\n" +
+                "\n".join(f"  ✗ {e}" for e in errors)
+            )
 
     model_config = SettingsConfigDict(
         env_file=(".env", "backend/.env"),

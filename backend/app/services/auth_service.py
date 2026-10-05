@@ -8,7 +8,13 @@ from fastapi import HTTPException, status
 from app.repositories.user_repo import UserRepository
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.schemas.auth import TokenResponse
-from app.core.security import create_access_token, hash_token, generate_refresh_token
+from app.core.security import (
+    create_access_token,
+    hash_token,
+    generate_refresh_token,
+    verify_password,
+    get_password_hash,
+)
 from app.core.config import settings
 from app.models.models import RefreshToken, User
 
@@ -64,9 +70,11 @@ class AuthService:
                 detail="A user with this email address already exists."
             )
 
+        hashed_pwd = get_password_hash(user_in.password) if user_in.password else None
         user = await self.user_repo.create(
             email=user_in.email,
-            full_name=user_in.full_name
+            full_name=user_in.full_name,
+            hashed_password=hashed_pwd
         )
 
         return await self._issue_token_pair(user, device_info=device_info, ip_address=ip_address)
@@ -78,7 +86,13 @@ class AuthService:
         if not user or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or account is inactive."
+                detail="Incorrect email or password."
+            )
+
+        if not user.hashed_password or not verify_password(credentials.password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password."
             )
 
         return await self._issue_token_pair(user, device_info=device_info, ip_address=ip_address)

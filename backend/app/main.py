@@ -125,6 +125,9 @@ app.include_router(api_router, prefix="/api")
 @app.on_event("startup")
 async def on_startup():
     """Ensure all 28 database tables are created and guest user is seeded."""
+    # Validate that required secrets are configured before touching the DB
+    settings.validate_required_secrets
+
     try:
         import app.models.models
         import app.models.character

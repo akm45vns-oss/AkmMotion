@@ -59,10 +59,10 @@ class GroqKeyManager:
     _lock = threading.Lock()
 
     # Best available Groq models (ordered by quality)
-    BEST_MODEL   = "openai/gpt-oss-120b"        # 120B parameter state-of-the-art model
-    FAST_MODEL   = "qwen/qwen3.8-27b"           # Top quality multilingual & storytelling
-    BACKUP_MODEL = "openai/gpt-oss-20b"          # Fast fallback model
-    VISION_MODEL = "meta-llama/llama-prompt-guard-2-86m"
+    BEST_MODEL   = "llama-3.3-70b-versatile"    # 70B parameter flagship model on Groq (128k context)
+    FAST_MODEL   = "llama-3.1-8b-instant"       # Ultra-fast Groq model (128k context)
+    BACKUP_MODEL = "gemma2-9b-it"               # Reliable Google Gemma2 fallback on Groq
+    VISION_MODEL = "llama-3.2-11b-vision-preview"  # Groq multimodal vision model
 
     @classmethod
     def get_instance(cls) -> "GroqKeyManager":

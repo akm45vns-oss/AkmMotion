@@ -19,10 +19,17 @@
 
 ## Last Updated
 
-- Date: 2026-10-03
-- Time: 22:03 IST
+- Date: 2026-10-04
+- Time: 22:25 IST
 - By: Antigravity AI
-- Session Summary: Comprehensive cleanup of non-core files from the project root and storage. Removed 89 temporary `.mp4` test renders from `backend/storage/videos/`, root temporary `__pycache__` and `test_voice.mp3`. Removed all non-core blueprint artifacts, performance audit reports, outdated documentation, scratch files, and legacy schemas. Staged, committed, and pushed all updates to `origin/main` on GitHub. Working tree is clean and fully synchronized.
+- Session Summary: Completed exhaustive production audit and remediation across all P0, P1, and P2 findings:
+  1. Scrubbed hardcoded DB credentials and live API keys from source code (`config.py`) and `.env` files; added fast-fail startup validation guard for missing secrets.
+  2. Fixed critical authentication gap: implemented direct `bcrypt` password hashing on registration and password verification on login; updated `User` model, schemas, and SQL schema to persist `hashed_password`.
+  3. Fixed `ai_pipeline_service.py`: added missing `settings` import and aligned Character Memory Engine (CME) dictionary keys (`hair_color`, `outfit`).
+  4. Fixed `GroqKeyManager`: updated model constants to active Groq production IDs (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gemma2-9b-it`).
+  5. Hardened `RenderEngineService`: implemented cross-platform FFmpeg path escaping on Windows, eliminated A/V truncation desync by replacing `-shortest` with audio `apad` filter and exact `-t` duration clipping, and added SSRF private IP validation on asset downloads.
+  6. Added bounded LRU cache (`_CACHE_MAX_SIZE = 200`) to `VoiceGeneratorService` to eliminate unbounded memory growth.
+  7. Added comprehensive automated test suite `tests/test_production_auth_e2e.py` verifying all fixes; all 23 unit, security, and integration tests passing cleanly.
 
 ---
 
@@ -94,4 +101,4 @@
 
 ---
 
-*End of brain.md — Last updated: 2026-09-14 18:22 IST*
+*End of brain.md — Last updated: 2026-10-04 22:25 IST*

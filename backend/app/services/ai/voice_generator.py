@@ -3,10 +3,32 @@ import re
 import asyncio
 import hashlib
 from typing import Optional, Dict
+from collections import OrderedDict
+import threading
 from app.core.config import settings
 
-# In-memory audio cache to prevent redundant synthesis and ensure 0ms replay
-_AUDIO_CACHE: Dict[str, bytes] = {}
+# Bounded LRU audio cache to prevent unbounded memory growth (max 200 items, ~30-60MB)
+_CACHE_MAX_SIZE = 200
+_AUDIO_CACHE: OrderedDict[str, bytes] = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+
+
+def _cache_get(key: str) -> Optional[bytes]:
+    with _CACHE_LOCK:
+        if key in _AUDIO_CACHE:
+            _AUDIO_CACHE.move_to_end(key)
+            return _AUDIO_CACHE[key]
+    return None
+
+
+def _cache_put(key: str, data: bytes) -> None:
+    with _CACHE_LOCK:
+        if key in _AUDIO_CACHE:
+            _AUDIO_CACHE.move_to_end(key)
+        else:
+            if len(_AUDIO_CACHE) >= _CACHE_MAX_SIZE:
+                _AUDIO_CACHE.popitem(last=False)
+        _AUDIO_CACHE[key] = data
 
 
 class VoiceGeneratorService:
@@ -70,8 +92,9 @@ class VoiceGeneratorService:
 
         resolved_voice = self._resolve_voice(clean_text, language, gender, voice)
         cache_key = hashlib.md5(f"{clean_text}:{resolved_voice}".encode("utf-8")).hexdigest()
-        if cache_key in _AUDIO_CACHE:
-            return _AUDIO_CACHE[cache_key]
+        cached_audio = _cache_get(cache_key)
+        if cached_audio:
+            return cached_audio
 
         # 1. Edge Neural TTS (Studio Quality)
         try:
@@ -83,7 +106,7 @@ class VoiceGeneratorService:
                     chunks.append(chunk["data"])
             audio_bytes = b"".join(chunks)
             if audio_bytes and len(audio_bytes) > 200:
-                _AUDIO_CACHE[cache_key] = audio_bytes
+                _cache_put(cache_key, audio_bytes)
                 return audio_bytes
         except Exception as e:
             print(f"[VoiceGenerator] Edge TTS error: {e}")
@@ -93,7 +116,7 @@ class VoiceGeneratorService:
             try:
                 res = self._try_openai_tts_sync(clean_text, language, gender)
                 if res and len(res) > 200:
-                    _AUDIO_CACHE[cache_key] = res
+                    _cache_put(cache_key, res)
                     return res
             except Exception as e:
                 print(f"[VoiceGenerator] OpenAI TTS error: {e}")
@@ -101,7 +124,7 @@ class VoiceGeneratorService:
         # 3. gTTS Fallback
         gtts_bytes = self._gtts_synthesize(clean_text, language)
         if gtts_bytes:
-            _AUDIO_CACHE[cache_key] = gtts_bytes
+            _cache_put(cache_key, gtts_bytes)
         return gtts_bytes
 
     def synthesize_to_bytes(

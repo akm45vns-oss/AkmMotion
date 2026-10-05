@@ -7,8 +7,16 @@ from fastapi import Request, HTTPException, status
 
 class RateLimiter:
     """
-    Sliding window thread-safe rate limiter with Redis-compatible semantics.
+    Sliding window thread-safe rate limiter.
     Enforces per-session, per-user, and per-proxy IP isolation.
+
+    DEPLOYMENT ARCHITECTURE NOTE (P2-2):
+    - This in-memory implementation operates on a per-process sliding window.
+    - In single-worker or development environments, it provides strict thread-safe isolation.
+    - In horizontally-scaled multi-worker deployments (e.g. multi-replica Kubernetes or multi-process
+      uvicorn), requests across separate worker processes maintain independent window state.
+      For production multi-instance clusters, configure REDIS_URL to promote to centralized
+      Redis-backed sliding window counters.
     """
 
     def __init__(self):

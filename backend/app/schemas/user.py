@@ -1,7 +1,7 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from app.models.models import AuthProvider, ThemeMode, VideoQuality
 
 
@@ -18,13 +18,13 @@ class UserSettingsResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str
-    full_name: str
+    password: str = Field(..., min_length=8, description="Minimum 8 characters password")
+    full_name: str = Field(..., min_length=1)
 
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=1)
 
 
 class UserResponse(BaseModel):
@@ -43,16 +43,18 @@ class UserResponse(BaseModel):
 
     @classmethod
     def from_user(cls, user):
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
         return cls(
             id=user.id,
             email=user.email,
             full_name=user.full_name,
-            avatar_url=user.avatar_url,
+            avatar_url=getattr(user, "avatar_url", None),
             auth_provider=user.auth_provider,
             is_active=user.is_active,
             is_verified=user.is_verified,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
+            created_at=getattr(user, "created_at", None) or now,
+            updated_at=getattr(user, "updated_at", None) or now,
             settings=None
         )
 

@@ -51,5 +51,5 @@ async def logout(
 
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest):
-    return {"message": f"Password reset instructions sent to {req.email} if account exists."}
+    return {"message": "If an account with that email exists, password reset instructions have been sent."}
 

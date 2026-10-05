@@ -15,6 +15,7 @@ from app.services.ai.character_detector import CharacterDetectorService
 from app.services.ai.prompt_builder import PromptBuilderService
 from app.services.ai.character_memory import CharacterMemoryService
 from app.schemas.character import CharacterCreate, CharacterDNA
+from app.core.config import settings
 
 
 class AIPipelineService:
@@ -56,30 +57,36 @@ class AIPipelineService:
         project.script.status = ScriptStatus.analyzing
         await self.db.commit()
 
-        # 2. CME Character Memory Engine: Detect & Load Locked Character DNA
+        # 2. CME Character Memory Engine: Detect & Load Locked Character DNA for ALL characters
         cme_service = CharacterMemoryService(self.db)
-        primary_char_dna: Dict[str, Any] = {}
-        primary_char_portrait_url: str = None
+        all_detected_chars: List[Dict[str, Any]] = []
 
         try:
             detected_chars = CharacterDetectorService.detect_characters(script_content)
-            if detected_chars:
-                primary = detected_chars[0]
-                
-                # Generate Pro Studio reference portrait for the main character
-                dna = primary.get("dna", {})
-                desc = f"{dna.get('age', '25')}yo {dna.get('gender', 'person')}, {dna.get('hair', '')}, {dna.get('clothing', '')}"
-                primary_char_portrait_url = await self.image_gen.generate_character_portrait(desc, project_style)
+            all_detected_chars = detected_chars or []
+            for c_idx, char_info in enumerate(all_detected_chars):
+                dna = char_info.get("dna", {})
+                hair = dna.get('hair_color') or dna.get('hair', '')
+                outfit = dna.get('outfit') or dna.get('clothing', '')
+                desc = f"{dna.get('age', '25')}yo {dna.get('gender', 'person')}, {hair}, {outfit}".strip(", ")
+
+                portrait_url = None
+                if c_idx < 2:
+                    try:
+                        portrait_url = await self.image_gen.generate_character_portrait(desc, project_style)
+                    except Exception:
+                        portrait_url = None
 
                 char_create = CharacterCreate(
-                    name=primary["name"],
-                    role=primary["role"],
+                    name=char_info["name"],
+                    role=char_info.get("role", "Protagonist" if c_idx == 0 else "Supporting"),
                     project_id=project.id,
                     is_locked=True,
                     dna=CharacterDNA.model_validate(dna)
                 )
-                db_char = await cme_service.create_character(actual_user_id, char_create)
-                primary_char_dna = dna
+                await cme_service.create_character(actual_user_id, char_create)
+
+            if all_detected_chars:
                 await self.db.commit()
         except Exception as cme_err:
             print(f"CME Character Detection Notice: {cme_err}")
@@ -102,7 +109,7 @@ class AIPipelineService:
             await self.db.delete(old_scene)
         await self.db.flush()
 
-        # 4. Create Scene & Asset records in DB with CME Character Prompt Injection
+        # 4. Create Scene & Asset records in DB with CME Multi-Character Prompt Injection
         created_scenes = []
         for s_data in raw_scenes:
             # Map strings to enums safely
@@ -122,7 +129,7 @@ class AIPipelineService:
                 cam_enum = CameraMotion.push
 
             raw_prompt = s_data.get("image_prompt", "")
-            
+
             # Enrich prompt with shot type if not already included
             shot_type_label = s_data.get("shot_type", "")
             if shot_type_label and shot_type_label.replace('_', ' ').lower() not in raw_prompt.lower():
@@ -133,11 +140,24 @@ class AIPipelineService:
             char_keywords = ["character", "person", "man", "woman", "prince", "king", "queen", "farmer", "worker", "villager", "hero", "face", "eyes", "close-up", "portrait", "standing", "walking", "he ", "she "]
             has_character_focus = any(kw in scene_text_lower for kw in char_keywords) or s_data.get("shot_type") in ["close_up", "medium_shot", "over_shoulder", "extreme_close_up"]
 
-            # INJECT CME CHARACTER DNA INTO PROMPT only when character is part of the scene
-            if primary_char_dna and has_character_focus:
-                injected_prompt = PromptBuilderService.inject_character_dna(
+            # Multi-character scene assignment:
+            # Detect which character(s) appear in this specific scene's narration / prompt
+            active_scene_chars = []
+            if all_detected_chars:
+                for c in all_detected_chars:
+                    c_name = c["name"].lower()
+                    if c_name in scene_text_lower:
+                        active_scene_chars.append(c)
+
+                # If no specific name matched, but scene focuses on character, default to primary character
+                if not active_scene_chars and has_character_focus:
+                    active_scene_chars = [all_detected_chars[0]]
+
+            # INJECT CME CHARACTER DNA INTO PROMPT
+            if active_scene_chars:
+                injected_prompt = PromptBuilderService.inject_multi_character_dna(
                     raw_scene_prompt=raw_prompt,
-                    character_dna_dict=primary_char_dna
+                    characters=active_scene_chars
                 )
             else:
                 injected_prompt = raw_prompt

@@ -5,7 +5,11 @@ from app.db.session import AsyncSessionLocal
 from app.models.models import User, RefreshToken, AuthProvider
 from app.services.auth_service import AuthService
 from app.core.security import decode_token, hash_token
+from app.core.config import settings
 from fastapi import HTTPException
+
+db_configured = bool(settings.DATABASE_URL and "CHANGE_ME" not in settings.DATABASE_URL)
+pytestmark = pytest.mark.skipif(not db_configured, reason="Live PostgreSQL database not configured (placeholder credentials in env)")
 
 
 @pytest.mark.asyncio

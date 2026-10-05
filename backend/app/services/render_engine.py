@@ -4,10 +4,14 @@ import shutil
 import asyncio
 import tempfile
 import subprocess
+import socket
+import ipaddress
+import urllib.parse
 from typing import List, Dict, Any, Optional
 import httpx
 
 from app.core.config import settings
+from app.core.secure_downloader import secure_download_media, is_safe_url, SSRFSecurityError, DownloadError
 
 
 class RenderEngineService:
@@ -16,8 +20,32 @@ class RenderEngineService:
     into a 1080x1920 vertical MP4 video (H.264/AAC) using server-side FFmpeg.
     """
 
+    TRANSITION_MAP = {
+        "fade": "fade",
+        "slide": "slideleft",
+        "wipe": "wipeleft",
+        "zoom": "zoomin",
+    }
+
     def __init__(self):
         self._ffmpeg_bin: Optional[str] = None
+
+    @staticmethod
+    def _escape_ffmpeg_path(path: str) -> str:
+        """
+        Safely escape a filesystem path for FFmpeg filtergraph options (e.g. drawtext textfile='...').
+        Converts Windows backslashes to forward slashes and escapes colons and quotes.
+        """
+        p = path.replace("\\", "/")
+        p = p.replace("'", r"\'")
+        p = p.replace(":", r"\:")
+        return p
+
+    @staticmethod
+    def _is_safe_download_url(url: str) -> bool:
+        """Centralized SSRF Guard check."""
+        safe, _ = is_safe_url(url)
+        return safe
 
     def get_ffmpeg_binary(self) -> str:
         """
@@ -153,13 +181,19 @@ class RenderEngineService:
                 narration = scene.get("narration", "")
                 await self._prepare_audio(scene.get("audio_url"), narration, audio_path, scene_duration)
 
-                # 3. Prepare subtitle text
+                # 3. Prepare subtitle text with timed ASS format
                 subtitle_text = scene.get("subtitle", "") or narration
                 has_subtitle = bool(subtitle_text.strip())
                 if has_subtitle:
-                    with open(sub_path, "w", encoding="utf-8") as sf:
-                        # Write single line clean subtitle
-                        sf.write(subtitle_text.strip())
+                    sub_path = os.path.join(tmp_dir, f"scene_{idx}_sub.ass")
+                    self._create_ass_subtitle_file(
+                        sub_path,
+                        subtitle_text,
+                        scene_duration,
+                        word_timings=scene.get("word_timings")
+                    )
+                else:
+                    sub_path = None
 
                 # 4. Render individual scene segment
                 camera_motion = scene.get("camera_motion", "push")
@@ -167,7 +201,7 @@ class RenderEngineService:
                     img_path=img_path if not has_video else "",
                     video_path=vid_path if has_video else None,
                     audio_path=audio_path,
-                    sub_path=sub_path if has_subtitle else None,
+                    sub_path=sub_path,
                     output_segment=segment_path,
                     duration=scene_duration,
                     camera_motion=camera_motion
@@ -178,42 +212,64 @@ class RenderEngineService:
                 else:
                     raise RuntimeError(f"Failed to render segment for scene {scene_num}")
 
-            # 5. Concatenate all segments into final MP4
+            # 5. Concatenate all segments into final MP4 with real transitions (fade, slide, wipe, zoom)
             if progress_callback:
-                await progress_callback(92, "Stitching scene segments into final MP4...")
+                await progress_callback(92, "Stitching scene segments with transitions into final MP4...")
+
+            scene_transitions = [str(s.get("transition", "fade")).lower() for s in scenes_data]
+            scene_durations = [float(s.get("duration", 5.0)) for s in scenes_data]
 
             if len(segment_files) == 1:
                 shutil.copy2(segment_files[0], output_path)
             else:
-                concat_list = os.path.join(tmp_dir, "concat.txt")
-                with open(concat_list, "w", encoding="utf-8") as f:
-                    for seg in segment_files:
-                        escaped_seg = seg.replace("\\", "/")
-                        f.write(f"file '{escaped_seg}'\n")
+                has_dynamic_transitions = any(
+                    t in ("fade", "slide", "wipe", "zoom")
+                    for t in scene_transitions[1:]
+                )
+                transition_success = False
+                if has_dynamic_transitions:
+                    try:
+                        transition_success = await self._concatenate_with_transitions(
+                            segment_files,
+                            scene_transitions,
+                            scene_durations,
+                            output_path,
+                            tmp_dir
+                        )
+                    except Exception as trans_err:
+                        print(f"[RenderEngine] Transition render notice: {trans_err}; falling back to concat.")
+                        transition_success = False
 
-                ret, _, err = await self._run_ffmpeg([
-                    "-y",
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", concat_list,
-                    "-c", "copy",
-                    output_path
-                ])
+                if not transition_success:
+                    concat_list = os.path.join(tmp_dir, "concat.txt")
+                    with open(concat_list, "w", encoding="utf-8") as f:
+                        for seg in segment_files:
+                            escaped_seg = seg.replace("\\", "/")
+                            f.write(f"file '{escaped_seg}'\n")
 
-                if ret != 0 or not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
-                    # Fallback re-encode concat if stream copy fails
                     ret, _, err = await self._run_ffmpeg([
                         "-y",
                         "-f", "concat",
                         "-safe", "0",
                         "-i", concat_list,
-                        "-c:v", "libx264",
-                        "-c:a", "aac",
-                        "-pix_fmt", "yuv420p",
+                        "-c", "copy",
                         output_path
                     ])
+
                     if ret != 0 or not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
-                        raise RuntimeError(f"FFmpeg concat failed: {err}")
+                        # Fallback re-encode concat if stream copy fails
+                        ret, _, err = await self._run_ffmpeg([
+                            "-y",
+                            "-f", "concat",
+                            "-safe", "0",
+                            "-i", concat_list,
+                            "-c:v", "libx264",
+                            "-c:a", "aac",
+                            "-pix_fmt", "yuv420p",
+                            output_path
+                        ])
+                        if ret != 0 or not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
+                            raise RuntimeError(f"FFmpeg concat failed: {err}")
 
             # 6. Validate final output
             if not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
@@ -236,12 +292,8 @@ class RenderEngineService:
                 downloaded = True
             elif image_url.startswith("http://") or image_url.startswith("https://"):
                 try:
-                    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                        resp = await client.get(image_url)
-                        if resp.status_code == 200 and len(resp.content) > 100:
-                            with open(dest_path, "wb") as f:
-                                f.write(resp.content)
-                            downloaded = True
+                    await secure_download_media(image_url, dest_path=dest_path, max_bytes=25 * 1024 * 1024)
+                    downloaded = True
                 except Exception as e:
                     print(f"[RenderEngine] Image download failed for scene {scene_num}: {e}")
 
@@ -268,12 +320,8 @@ class RenderEngineService:
                 return False
         if video_url.startswith("http://") or video_url.startswith("https://"):
             try:
-                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                    resp = await client.get(video_url)
-                    if resp.status_code == 200 and len(resp.content) > 1000:
-                        with open(dest_path, "wb") as f:
-                            f.write(resp.content)
-                        return True
+                await secure_download_media(video_url, dest_path=dest_path, max_bytes=100 * 1024 * 1024)
+                return True
             except Exception as e:
                 print(f"[RenderEngine] Video clip download failed for scene {scene_num}: {e}")
         return False
@@ -287,12 +335,8 @@ class RenderEngineService:
                 obtained = True
             elif audio_url.startswith("http://") or audio_url.startswith("https://"):
                 try:
-                    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-                        resp = await client.get(audio_url)
-                        if resp.status_code == 200 and len(resp.content) > 100:
-                            with open(dest_path, "wb") as f:
-                                f.write(resp.content)
-                            obtained = True
+                    await secure_download_media(audio_url, dest_path=dest_path, max_bytes=25 * 1024 * 1024)
+                    obtained = True
                 except Exception as e:
                     print(f"[RenderEngine] Audio download failed: {e}")
 
@@ -342,14 +386,17 @@ class RenderEngineService:
                 f"fps={fps}"
             )
             if sub_path and os.path.isfile(sub_path):
-                escaped_sub = sub_path.replace("\\", "/").replace(":", "\\:")
-                drawtext_filter = (
-                    f"drawtext=textfile='{escaped_sub}':"
-                    f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:"
-                    f"box=1:boxcolor=black@0.6:boxborderw=10:"
-                    f"x=(w-text_w)/2:y=h-th-260"
-                )
-                filter_chain += f",{drawtext_filter}"
+                escaped_sub = self._escape_ffmpeg_path(sub_path)
+                if sub_path.endswith(".ass"):
+                    sub_filter = f"ass='{escaped_sub}'"
+                else:
+                    sub_filter = (
+                        f"drawtext=textfile='{escaped_sub}':"
+                        f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:"
+                        f"box=1:boxcolor=black@0.6:boxborderw=10:"
+                        f"x=(w-text_w)/2:y=h-th-260"
+                    )
+                filter_chain += f",{sub_filter}"
 
             args = [
                 "-y",
@@ -364,7 +411,8 @@ class RenderEngineService:
                 "-c:a", "aac",
                 "-b:a", "192k",
                 "-ar", "44100",
-                "-shortest",
+                "-af", "apad",
+                "-t", f"{duration:.2f}",
                 "-preset", "veryfast",
                 output_segment
             ]
@@ -420,17 +468,19 @@ class RenderEngineService:
         )
 
 
-        # Subtitle burning via drawtext if subtitle exists
+        # Subtitle burning via ASS or drawtext if subtitle exists
         if sub_path and os.path.isfile(sub_path):
-            escaped_sub = sub_path.replace("\\", "/").replace(":", "\\:")
-            # Draw subtitle box near bottom center (y=1920-280)
-            drawtext_filter = (
-                f"drawtext=textfile='{escaped_sub}':"
-                f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:"
-                f"box=1:boxcolor=black@0.6:boxborderw=10:"
-                f"x=(w-text_w)/2:y=h-th-260"
-            )
-            filter_chain += f",{drawtext_filter}"
+            escaped_sub = self._escape_ffmpeg_path(sub_path)
+            if sub_path.endswith(".ass"):
+                sub_filter = f"ass='{escaped_sub}'"
+            else:
+                sub_filter = (
+                    f"drawtext=textfile='{escaped_sub}':"
+                    f"fontsize=48:fontcolor=yellow:borderw=3:bordercolor=black:"
+                    f"box=1:boxcolor=black@0.6:boxborderw=10:"
+                    f"x=(w-text_w)/2:y=h-th-260"
+                )
+            filter_chain += f",{sub_filter}"
 
         args = [
             "-y",
@@ -445,7 +495,8 @@ class RenderEngineService:
             "-c:a", "aac",
             "-b:a", "192k",
             "-ar", "44100",
-            "-shortest",
+            "-af", "apad",
+            "-t", f"{duration:.2f}",
             "-preset", "veryfast",
             output_segment
         ]
@@ -485,3 +536,117 @@ class RenderEngineService:
         ret, _, err = await self._run_ffmpeg(args)
         if ret != 0 or not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
             raise RuntimeError(f"FFmpeg fallback card render failed: {err}")
+
+    @staticmethod
+    def _create_ass_subtitle_file(
+        output_file: str,
+        text: str,
+        duration: float,
+        word_timings: Optional[List[Dict[str, Any]]] = None
+    ) -> str:
+        """
+        Creates an Advanced SubStation Alpha (ASS) file with exact timed events
+        and vertical 9:16 layout (1080x1920).
+        """
+        from app.services.ai.subtitle_generator import SubtitleGeneratorService
+
+        timings = word_timings or SubtitleGeneratorService.compute_word_timings_from_text(text, duration)
+
+        header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,56,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,2,2,40,40,260,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+        def fmt_time(seconds: float) -> str:
+            h = int(seconds // 3600)
+            m = int((seconds % 3600) // 60)
+            s = int(seconds % 60)
+            cs = int(round((seconds - int(seconds)) * 100))
+            return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+        events = []
+        if timings:
+            chunk_size = 4
+            for i in range(0, len(timings), chunk_size):
+                chunk = timings[i:i + chunk_size]
+                chunk_start = float(chunk[0].get("start", 0.0))
+                chunk_end = float(chunk[-1].get("end", duration))
+                chunk_text = " ".join(str(item.get("word", "")) for item in chunk)
+                events.append(f"Dialogue: 0,{fmt_time(chunk_start)},{fmt_time(chunk_end)},Default,,0,0,0,,{chunk_text}")
+        else:
+            events.append(f"Dialogue: 0,0:00:00.20,{fmt_time(duration)},Default,,0,0,0,,{text.strip()}")
+
+        content = header + "\n".join(events) + "\n"
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(content)
+        return output_file
+
+    async def _concatenate_with_transitions(
+        self,
+        segment_files: List[str],
+        transitions: List[str],
+        durations: List[float],
+        output_path: str,
+        tmp_dir: str
+    ) -> bool:
+        """
+        Concatenates video segments with smooth video crossfade transitions (xfade)
+        and audio crossfade (acrossfade).
+        """
+        if len(segment_files) < 2:
+            shutil.copy2(segment_files[0], output_path)
+            return True
+
+        cmd = ["-y"]
+        for seg in segment_files:
+            cmd.extend(["-i", seg])
+
+        filter_parts = []
+        trans_duration = 0.5
+        current_offset = max(durations[0] - trans_duration, 0.1) if durations else 2.5
+
+        last_v = "0:v"
+        last_a = "0:a"
+
+        for i in range(1, len(segment_files)):
+            t_name = transitions[i] if i < len(transitions) else "fade"
+            xfade_type = self.TRANSITION_MAP.get(t_name, "fade")
+            out_v = f"v{i}"
+            out_a = f"a{i}"
+
+            offset_val = max(current_offset, 0.1)
+            filter_parts.append(
+                f"[{last_v}][{i}:v]xfade=transition={xfade_type}:duration={trans_duration}:offset={offset_val:.2f}[{out_v}]"
+            )
+            filter_parts.append(
+                f"[{last_a}][{i}:a]acrossfade=d={trans_duration}[{out_a}]"
+            )
+            last_v = out_v
+            last_a = out_a
+            if i < len(durations):
+                current_offset += max(durations[i] - trans_duration, 0.1)
+
+        filter_graph = ";".join(filter_parts)
+        cmd.extend([
+            "-filter_complex", filter_graph,
+            "-map", f"[{last_v}]",
+            "-map", f"[{last_a}]",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-preset", "veryfast",
+            output_path
+        ])
+
+        ret, _, err = await self._run_ffmpeg(cmd, timeout=300.0)
+        return ret == 0 and os.path.isfile(output_path) and os.path.getsize(output_path) > 0
