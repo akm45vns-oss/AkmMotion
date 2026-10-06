@@ -576,12 +576,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         events = []
         if timings:
             chunk_size = 4
-            for i in range(0, len(timings), chunk_size):
-                chunk = timings[i:i + chunk_size]
-                chunk_start = float(chunk[0].get("start", 0.0))
-                chunk_end = float(chunk[-1].get("end", duration))
-                chunk_text = " ".join(str(item.get("word", "")) for item in chunk)
-                events.append(f"Dialogue: 0,{fmt_time(chunk_start)},{fmt_time(chunk_end)},Default,,0,0,0,,{chunk_text}")
+            for c_start in range(0, len(timings), chunk_size):
+                chunk = timings[c_start:c_start + chunk_size]
+                for active_i, active_item in enumerate(chunk):
+                    w_start = float(active_item.get("start") or (active_item.get("start_ms", 0) / 1000.0))
+                    w_end = float(active_item.get("end") or (active_item.get("end_ms", 0) / 1000.0))
+                    if w_end <= w_start:
+                        w_end = w_start + 0.15
+
+                    line_words = []
+                    for idx, item in enumerate(chunk):
+                        word_str = str(item.get("word", "")).strip()
+                        if idx == active_i:
+                            line_words.append(r"{\c&H00FFFF&\b1}" + word_str + r"{\r}")
+                        else:
+                            line_words.append(word_str)
+
+                    cue_text = " ".join(line_words)
+                    events.append(f"Dialogue: 0,{fmt_time(w_start)},{fmt_time(w_end)},Default,,0,0,0,,{cue_text}")
         else:
             events.append(f"Dialogue: 0,0:00:00.20,{fmt_time(duration)},Default,,0,0,0,,{text.strip()}")
 

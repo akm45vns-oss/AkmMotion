@@ -112,26 +112,50 @@ export default function VideoPreview({ activeScene: propScene }: VideoPreviewPro
         const duration = scene.duration || 5;
         const text = scene.subtitle || scene.narration || "";
         const words = text.trim().split(/\s+/).filter(Boolean);
-        const perWordMs = (duration * 1000) / Math.max(words.length, 1);
+        const wordTimings = scene.word_timings || scene.subtitles;
 
-        let wordIdx = 0;
-        const wordTimer = setInterval(() => {
-          if (wordIdx < words.length) {
-            setCurrentWordIndex(wordIdx);
-            wordIdx++;
-          } else {
-            clearInterval(wordTimer);
-          }
-        }, perWordMs);
+        let wordTimer: any = null;
+
+        // Canonical timing synchronization via audio timeupdate
+        if (Array.isArray(wordTimings) && wordTimings.length > 0) {
+          audio.ontimeupdate = () => {
+            const currentMs = audio.currentTime * 1000;
+            const activeIdx = wordTimings.findIndex(
+              (t: any) => currentMs >= t.start_ms && currentMs <= t.end_ms
+            );
+            if (activeIdx !== -1) {
+              setCurrentWordIndex(activeIdx);
+            } else {
+              // Continuity: pick the latest word whose start_ms has passed
+              let lastStarted = -1;
+              for (let i = 0; i < wordTimings.length; i++) {
+                if (currentMs >= wordTimings[i].start_ms) lastStarted = i;
+              }
+              if (lastStarted !== -1) setCurrentWordIndex(lastStarted);
+            }
+          };
+        } else {
+          // Fallback pacing timer if canonical word timings are not yet generated
+          const perWordMs = (duration * 1000) / Math.max(words.length, 1);
+          let wordIdx = 0;
+          wordTimer = setInterval(() => {
+            if (wordIdx < words.length) {
+              setCurrentWordIndex(wordIdx);
+              wordIdx++;
+            } else {
+              clearInterval(wordTimer);
+            }
+          }, perWordMs);
+        }
 
         audio.onended = () => {
-          clearInterval(wordTimer);
+          if (wordTimer) clearInterval(wordTimer);
           resetKaraoke();
           onEnd?.();
         };
 
         audio.onerror = () => {
-          clearInterval(wordTimer);
+          if (wordTimer) clearInterval(wordTimer);
           playSpeechFallback(scene, onEnd);
         };
 

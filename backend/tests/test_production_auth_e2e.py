@@ -227,6 +227,15 @@ def test_multi_character_dna_prompt_generation():
     assert "Hair Color" in spec.locked_attributes
 
 
+class MockStreamContext:
+    def __init__(self, resp):
+        self.resp = resp
+    async def __aenter__(self):
+        return self.resp
+    async def __aexit__(self, *args):
+        pass
+
+
 @pytest.mark.asyncio
 async def test_ssrf_redirect_chain_defense():
     """Verify that secure_download_media rejects redirects targeting internal/metadata IPs (P2-4)."""
@@ -236,7 +245,7 @@ async def test_ssrf_redirect_chain_defense():
 
     # Redirect to loopback 127.0.0.1
     mock_redirect_loopback = httpx.Response(302, headers={"Location": "http://127.0.0.1:8000/internal-admin"})
-    with patch.object(httpx.AsyncClient, "get", return_value=mock_redirect_loopback):
+    with patch.object(httpx.AsyncClient, "stream", return_value=MockStreamContext(mock_redirect_loopback)):
         with pytest.raises(SSRFSecurityError) as exc_info:
             await secure_download_media("https://example.com/asset.mp4")
         assert "SSRF redirect violation" in str(exc_info.value)
@@ -244,11 +253,251 @@ async def test_ssrf_redirect_chain_defense():
 
     # Redirect to cloud metadata 169.254.169.254
     mock_redirect_metadata = httpx.Response(302, headers={"Location": "http://169.254.169.254/latest/meta-data"})
-    with patch.object(httpx.AsyncClient, "get", return_value=mock_redirect_metadata):
+    with patch.object(httpx.AsyncClient, "stream", return_value=MockStreamContext(mock_redirect_metadata)):
         with pytest.raises(SSRFSecurityError) as exc_meta:
             await secure_download_media("https://example.com/asset.mp4")
         assert "SSRF redirect violation" in str(exc_meta.value)
         assert "169.254.169.254" in str(exc_meta.value)
+
+
+@pytest.mark.asyncio
+async def test_streaming_chunk_size_abort_prevents_memory_exhaustion():
+    """Verify that streaming downloader aborts immediately when bytes exceed max_bytes without buffering full response (P0)."""
+    import httpx
+    from unittest.mock import patch
+    from app.core.secure_downloader import secure_download_media, DownloadError
+
+    class MockChunkStream:
+        def __init__(self):
+            self.status_code = 200
+            self.headers = {"Content-Type": "video/mp4"}
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def aiter_bytes(self, chunk_size=65536):
+            # Emits 5 chunks of 50KB = 250KB total
+            for _ in range(5):
+                yield b"X" * 50000
+
+    # Limit to 100KB: chunk 1 (50K) ok, chunk 2 (100K) ok, chunk 3 (150K) triggers abortion
+    with patch.object(httpx.AsyncClient, "stream", return_value=MockChunkStream()):
+        with pytest.raises(DownloadError) as exc_info:
+            await secure_download_media("https://example.com/large_video.mp4", max_bytes=100000)
+        assert "exceeded limit" in str(exc_info.value)
+        assert "aborted at 150000" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_ssrf_redirect_loop_and_unsupported_schemes():
+    """Verify rejection of redirect loops and non-http schemes like file:// or ftp://."""
+    import httpx
+    from unittest.mock import patch
+    from app.core.secure_downloader import secure_download_media, SSRFSecurityError, DownloadError
+
+    # 1. Scheme check: file:///etc/passwd
+    mock_file = httpx.Response(302, headers={"Location": "file:///etc/passwd"})
+    with patch.object(httpx.AsyncClient, "stream", return_value=MockStreamContext(mock_file)):
+        with pytest.raises(SSRFSecurityError) as exc_scheme:
+            await secure_download_media("https://example.com/asset.mp4")
+        assert "Forbidden redirect scheme 'file'" in str(exc_scheme.value)
+
+    # 2. Redirect loop
+    mock_loop = httpx.Response(302, headers={"Location": "https://example.com/asset.mp4"})
+    with patch.object(httpx.AsyncClient, "stream", return_value=MockStreamContext(mock_loop)):
+        with pytest.raises(DownloadError) as exc_loop:
+            await secure_download_media("https://example.com/asset.mp4")
+        assert "Redirect loop detected" in str(exc_loop.value)
+
+
+def test_production_celery_enforcement_and_no_silent_fallback():
+    """Verify that production environment strictly enforces Celery and refuses silent fallback to in-process tasks (P1)."""
+    from unittest.mock import patch
+    from uuid import uuid4
+    from app.core.config import Settings
+    from app.tasks.video_tasks import dispatch_render_job
+
+    # 1. Background mode in production is rejected at startup
+    prod_bad = Settings(
+        DATABASE_URL="postgresql://host/db",
+        JWT_SECRET="x" * 40,
+        ENVIRONMENT="production",
+        RENDER_EXECUTION_MODE="background",
+        CELERY_BROKER_URL="redis://host:6379/0"
+    )
+    with pytest.raises(RuntimeError) as exc_conf:
+        prod_bad.validate_required_secrets
+    assert "RENDER_EXECUTION_MODE must be set to 'celery' in production" in str(exc_conf.value)
+
+    # 2. Celery mode in production is accepted
+    prod_good = Settings(
+        DATABASE_URL="postgresql://host/db",
+        JWT_SECRET="x" * 40,
+        ENVIRONMENT="production",
+        RENDER_EXECUTION_MODE="celery",
+        CELERY_BROKER_URL="redis://host:6379/0"
+    )
+    # Should not raise
+    prod_good.validate_required_secrets
+
+    # 3. Production dispatch failure raises RuntimeError and NEVER falls back to BackgroundTasks
+    with patch("app.core.config.settings.ENVIRONMENT", "production"), patch("app.core.config.settings.RENDER_EXECUTION_MODE", "celery"):
+        with patch("app.tasks.video_tasks.render_video_task.apply_async", side_effect=Exception("Redis broker refused")):
+            with pytest.raises(RuntimeError) as exc_dispatch:
+                dispatch_render_job(uuid4(), uuid4(), uuid4())
+            assert "Production render dispatch failed" in str(exc_dispatch.value)
+            assert "In-process background rendering is strictly prohibited" in str(exc_dispatch.value)
+
+
+def test_distributed_rate_limiter_sliding_window():
+    """Verify DistributedRateLimiter handles sliding windows, bursts, and key isolation."""
+    from app.core.rate_limit import DistributedRateLimiter
+
+    limiter = DistributedRateLimiter()
+    limiter.reset()
+
+    key_a = "user:test_user_a"
+    key_b = "user:test_user_b"
+
+    # Allow up to 3 requests per 10 seconds
+    assert limiter.is_allowed(key_a, max_requests=3, window_seconds=10) is True
+    assert limiter.is_allowed(key_a, max_requests=3, window_seconds=10) is True
+    assert limiter.is_allowed(key_a, max_requests=3, window_seconds=10) is True
+    # 4th request must be blocked
+    assert limiter.is_allowed(key_a, max_requests=3, window_seconds=10) is False
+
+    # Different key (key_b) must still be allowed (key isolation)
+    assert limiter.is_allowed(key_b, max_requests=3, window_seconds=10) is True
+
+    # Reset clears history
+    limiter.reset()
+    assert limiter.is_allowed(key_a, max_requests=3, window_seconds=10) is True
+
+
+@pytest.mark.asyncio
+async def test_render_cancellation_revokes_celery_task():
+    """Verify that cancel_render_job invokes Celery revocation when task ID is present."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from uuid import uuid4
+    from app.services.render_service import RenderService
+    from app.models.models import RenderJob, RenderStatus
+
+    job_id = uuid4()
+    user_id = uuid4()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    mock_job = RenderJob(
+        id=job_id,
+        project_id=uuid4(),
+        user_id=user_id,
+        status=RenderStatus.processing,
+        progress=50,
+        celery_task_id="celery-task-12345",
+        created_at=now,
+        updated_at=now
+    )
+
+    mock_db = AsyncMock()
+    service = RenderService(mock_db)
+    service.repo.get_by_id = AsyncMock(return_value=mock_job)
+    service.repo.cancel_job = AsyncMock(return_value=mock_job)
+
+    with patch("app.tasks.celery_app.celery_app.control.revoke") as mock_revoke:
+        await service.cancel_render_job(job_id, user_id)
+        mock_revoke.assert_called_once_with("celery-task-12345", terminate=True, signal="SIGTERM")
+
+
+def test_subtitle_canonical_validation_and_timing_source():
+    """Verify canonical subtitle schema validation, timing source tracking, and Devanagari handling."""
+    from app.services.ai.subtitle_generator import SubtitleGeneratorService
+
+    # 1. Valid timings
+    valid_timings = [
+        {"word": "Namaste", "start_ms": 200, "end_ms": 700},
+        {"word": "duniya", "start_ms": 700, "end_ms": 1400},
+    ]
+    ok, err = SubtitleGeneratorService.validate_word_timings(valid_timings, total_duration_seconds=2.0)
+    assert ok is True
+    assert err is None
+
+    # 2. Non-monotonic timings rejected
+    bad_mono = [
+        {"word": "First", "start_ms": 500, "end_ms": 900},
+        {"word": "Second", "start_ms": 300, "end_ms": 800},
+    ]
+    ok_mono, err_mono = SubtitleGeneratorService.validate_word_timings(bad_mono, total_duration_seconds=2.0)
+    assert ok_mono is False
+    assert "monotonic" in err_mono
+
+    # 3. Negative start rejected
+    bad_neg = [{"word": "Bad", "start_ms": -50, "end_ms": 400}]
+    ok_neg, err_neg = SubtitleGeneratorService.validate_word_timings(bad_neg, total_duration_seconds=1.0)
+    assert ok_neg is False
+    assert "negative" in err_neg
+
+    # 4. End before start rejected
+    bad_end = [{"word": "Bad", "start_ms": 500, "end_ms": 400}]
+    ok_end, err_end = SubtitleGeneratorService.validate_word_timings(bad_end, total_duration_seconds=1.0)
+    assert ok_end is False
+    assert "invalid duration" in err_end
+
+    # 5. Devanagari script word timings
+    hindi_text = "नमस्ते भारत AkmMotion"
+    hindi_timings = SubtitleGeneratorService.compute_word_timings_from_text(hindi_text, 3.0)
+    assert len(hindi_timings) == 3
+    assert hindi_timings[0]["word"] == "नमस्ते"
+    assert hindi_timings[0]["start_ms"] >= 0
+    assert hindi_timings[-1]["end_ms"] <= 3500
+
+
+@pytest.mark.asyncio
+async def test_real_mp4_generation_with_karaoke_ass_subtitles():
+    """Verify end-to-end real FFmpeg compilation of 1080x1920 MP4 with burned-in ASS karaoke subtitles."""
+    import os
+    import tempfile
+    from app.services.render_engine import RenderEngineService
+    from app.services.ai.subtitle_generator import SubtitleGeneratorService
+
+    engine = RenderEngineService()
+    tmp_dir = tempfile.gettempdir()
+    img_path = os.path.join(tmp_dir, f"test_e2e_img_{uuid4().hex[:6]}.png")
+    audio_path = os.path.join(tmp_dir, f"test_e2e_aud_{uuid4().hex[:6]}.mp3")
+    sub_path = os.path.join(tmp_dir, f"test_e2e_sub_{uuid4().hex[:6]}.ass")
+    out_path = os.path.join(tmp_dir, f"test_e2e_out_{uuid4().hex[:6]}.mp4")
+
+    try:
+        # 1. 1080x1920 graphic card
+        await engine._run_ffmpeg([
+            "-y", "-f", "lavfi", "-i", "color=c=0x0F172A:s=1080x1920:d=1", "-vframes", "1", img_path
+        ])
+        # 2. 2.5s stereo audio
+        await engine._run_ffmpeg([
+            "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "2.5", "-c:a", "libmp3lame", "-b:a", "128k", audio_path
+        ])
+        # 3. ASS Subtitle generation with karaoke active highlights
+        text = "AkmMotion production release ready"
+        timings = SubtitleGeneratorService.compute_word_timings_from_text(text, 2.5)
+        engine._create_ass_subtitle_file(sub_path, text, 2.5, timings)
+
+        # 4. Compile scene segment via FFmpeg
+        await engine._render_scene_segment(
+            img_path=img_path,
+            audio_path=audio_path,
+            sub_path=sub_path,
+            output_segment=out_path,
+            duration=2.5,
+            camera_motion="push"
+        )
+
+        assert os.path.isfile(out_path) is True
+        assert os.path.getsize(out_path) > 1000  # Non-trivial MP4 size
+    finally:
+        for p in [img_path, audio_path, sub_path, out_path]:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
 
 
 @pytest.mark.asyncio
@@ -369,4 +618,5 @@ def test_canonical_subtitle_timing_and_ass_file():
     finally:
         if os.path.exists(tmp_ass.name):
             os.remove(tmp_ass.name)
+
 

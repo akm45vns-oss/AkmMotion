@@ -1,4 +1,4 @@
-﻿# AkmMotion Production Deployment Requirements
+# AkmMotion Production Deployment Requirements
 
 > This document covers the exact requirements for running the production render pipeline
 > durably and safely. Read before deploying to Railway, Render.com, or any container platform.
@@ -36,61 +36,46 @@ The `video_storage_dir` property in `config.py` automatically resolves to:
 
 ---
 
-## 2. Background Execution — KNOWN LIMITATION
+## 2. Production Render Execution: Celery + Redis
 
-### Current Architecture
+### Architecture
 ```
-POST /render/start → FastAPI BackgroundTasks → execute_render_background → FFmpeg
+Frontend
+   ↓
+FastAPI API (POST /api/v1/render/start/{project_id})
+   ↓
+Durable PostgreSQL RenderJob (status=queued)
+   ↓
+Redis Broker (CELERY_BROKER_URL)
+   ↓
+Celery Worker (video_tasks.render_video_task)
+   ↓
+FFmpeg (1080×1920 MP4)
+   ↓
+Persistent Storage (/app/storage/videos)
 ```
 
-`FastAPI BackgroundTasks` runs **inside the uvicorn ASGI event loop**. This means:
+In `ENVIRONMENT=production`, `RENDER_EXECUTION_MODE=celery` is **mandatory**. FastAPI's in-process `BackgroundTasks` is restricted to local development to ensure production render jobs survive container redeployments, web restarts, and horizontal scaling.
 
-| Risk | Reality |
-|------|---------|
-| Render survives a redeploy? | ❌ **No** — uvicorn process is killed |
-| Render survives container restart? | ❌ **No** |
-| Jobs retry automatically on failure? | ❌ **No** |
-| Render works if process stays alive? | ✅ **Yes** |
+### Production Enforcement Rules
+- If `ENVIRONMENT=production` and `RENDER_EXECUTION_MODE=background`: The backend startup validation fails fast (`SystemExit(1)`).
+- If `RENDER_EXECUTION_MODE=celery` and `CELERY_BROKER_URL` is empty: The backend startup validation fails fast (`SystemExit(1)`).
+- Render dispatch fails fast if the Redis broker is unavailable in production (no silent fallback to in-process execution).
 
-### When This Is Acceptable
-- Renders complete in < 2 minutes (typical for 1–5 scenes)
-- Deploys are infrequent / done during low-traffic windows
-- Failed jobs show `status=failed` and users can re-trigger from the frontend
-
-### When This Becomes a Problem
-- Long renders (10+ scene projects, 10+ minute renders)
-- High-frequency deploys (CI/CD on every commit)
-- User-facing SLA requirements on render completion
-
-### Upgrade Path: Celery + Redis
-
-If durable background execution is required, the codebase already has `backend/app/tasks/celery_app.py`
-configured correctly with a 10-minute task timeout.
-
-**Steps to enable:**
-
-1. **Add a free Redis instance** (e.g., Railway Redis add-on, Upstash free tier):
+### Process Topology
+Production deployments require two processes:
+1. **Web Service**:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port $PORT
    ```
-   CELERY_BROKER_URL=redis://your-redis-host:6379/0
-   CELERY_RESULT_BACKEND=redis://your-redis-host:6379/0
+2. **Celery Worker**:
+   ```bash
+   celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
    ```
 
-2. **Add a Celery task** wrapping `execute_render_background` in `celery_app.py`.
-
-3. **Update `railway.json`** to start both the web server and the Celery worker:
-   ```json
-   {
-     "deploy": {
-       "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT & celery -A app.tasks.celery_app worker --loglevel=info"
-     }
-   }
-   ```
-
-4. **Update `render_service.py`** to call `celery_task.delay(...)` instead of
-   `background_tasks.add_task(...)`.
-
-> ⚠️ **Do not enable Celery without first testing the Redis connection** in your staging
-> environment. An unreachable broker will block render job dispatch.
+### Stale Job Recovery & Cancellation
+- **Stale Job Sweeper**: Jobs stuck in `running` or `pending` longer than 15 minutes without progress can be automatically recovered via `RenderService.recover_stale_jobs(stale_seconds=900)`.
+- **Cancellation**: `POST /api/v1/render/cancel/{job_id}` calls `celery_app.control.revoke(job.celery_task_id, terminate=True, signal="SIGTERM")` to cleanly interrupt active FFmpeg worker processes and remove temporary files.
 
 ---
 
@@ -116,13 +101,16 @@ available even if the system `ffmpeg` is missing.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | ✅ | Neon PostgreSQL async connection string |
-| `JWT_SECRET` | ✅ | Must be ≥ 32 chars, strong random value |
+| `DATABASE_URL` | ✅ | Neon PostgreSQL async connection string (`postgresql+asyncpg://...`) |
+| `JWT_SECRET` | ✅ | Must be ≥ 32 chars, strong random secret |
+| `ENVIRONMENT` | ✅ | `production` (enforces HSTS, secure cookies, and mandatory Celery) or `development` |
+| `RENDER_EXECUTION_MODE` | ✅ in prod | `celery` (mandatory in production) or `background` (allowed in development) |
+| `CELERY_BROKER_URL` | ✅ in prod | Redis broker URI (`redis://...`) required when `RENDER_EXECUTION_MODE=celery` |
+| `TIMING_MODE` | ❌ optional | `acoustic` (OpenAI Whisper timestamp alignment) or `heuristic` (Devanagari/Latin syllable pacing, default) |
 | `STORAGE_DIR` | ✅ for persistence | Mount path for the persistent volume (e.g. `/app/storage`) |
+| `GROQ_API_KEY` | ✅ for AI | Primary Groq API key for script intelligence & scene director |
 | `FFMPEG_PATH` | ❌ optional | Override FFmpeg binary path; auto-discovered if unset |
-| `CELERY_BROKER_URL` | ❌ optional | Required only if upgrading to Celery |
-| `GROQ_API_KEY` | ✅ for AI | Primary Groq API key for script intelligence |
-| `ENVIRONMENT` | ✅ | Set to `production` to enable secure cookie flags |
+| `OPENAI_API_KEY` | ❌ optional | Required for acoustic audio alignment (`TIMING_MODE=acoustic`) |
 
 ---
 

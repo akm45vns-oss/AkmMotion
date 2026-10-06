@@ -1,40 +1,109 @@
 import time
+import uuid
+import logging
 import threading
 from typing import Dict, List, Optional
 from collections import defaultdict
 from fastapi import Request, HTTPException, status
 
+logger = logging.getLogger(__name__)
 
-class RateLimiter:
+# Atomic sliding-window rate limit Lua script
+_SLIDING_WINDOW_LUA = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+local member = ARGV[4]
+local clear_before = now - window
+
+redis.call('ZREMRANGEBYSCORE', key, '-inf', clear_before)
+local current_requests = redis.call('ZCARD', key)
+if current_requests < limit then
+    redis.call('ZADD', key, now, member)
+    redis.call('EXPIRE', key, math.ceil(window) + 2)
+    return 1
+else
+    return 0
+end
+"""
+
+
+class DistributedRateLimiter:
     """
-    Sliding window thread-safe rate limiter.
-    Enforces per-session, per-user, and per-proxy IP isolation.
-
-    DEPLOYMENT ARCHITECTURE NOTE (P2-2):
-    - This in-memory implementation operates on a per-process sliding window.
-    - In single-worker or development environments, it provides strict thread-safe isolation.
-    - In horizontally-scaled multi-worker deployments (e.g. multi-replica Kubernetes or multi-process
-      uvicorn), requests across separate worker processes maintain independent window state.
-      For production multi-instance clusters, configure REDIS_URL to promote to centralized
-      Redis-backed sliding window counters.
+    Production-grade distributed sliding window rate limiter backed by Redis.
+    Uses an atomic Lua script for zero-race-condition multi-process and multi-replica enforcement.
+    Falls back gracefully to a thread-safe in-memory sliding window when Redis is unavailable in development.
     """
 
-    def __init__(self):
+    def __init__(self, redis_url: Optional[str] = None):
         self._lock = threading.Lock()
         self.requests: Dict[str, List[float]] = defaultdict(list)
+        self._redis_url = redis_url
+        self._redis_client = None
+        self._redis_tested = False
+        self._redis_available = False
+
+    def _get_redis(self):
+        if not self._redis_tested:
+            self._redis_tested = True
+            try:
+                import redis
+                from app.core.config import settings
+                url = self._redis_url or settings.REDIS_URL
+                if url and "CHANGE_ME" not in url:
+                    client = redis.from_url(
+                        url,
+                        socket_timeout=0.25,
+                        socket_connect_timeout=0.25,
+                        decode_responses=True
+                    )
+                    client.ping()
+                    self._redis_client = client
+                    self._redis_available = True
+                    logger.info("[RateLimiter] Connected to Redis for distributed rate limiting.")
+            except Exception as e:
+                self._redis_available = False
+                logger.info(f"[RateLimiter] Redis not available ({e}); using thread-safe in-memory sliding window.")
+        return self._redis_client if self._redis_available else None
 
     def reset(self) -> None:
-        """Resets all request history (useful for test isolation and session resets)."""
+        """Resets all request history in-memory and in Redis."""
         with self._lock:
             self.requests.clear()
+        r = self._get_redis()
+        if r:
+            try:
+                keys = r.keys("ratelimit:*")
+                if keys:
+                    r.delete(*keys)
+            except Exception:
+                pass
 
     def is_allowed(self, key: str, max_requests: int, window_seconds: int) -> bool:
+        r = self._get_redis()
+        if r:
+            try:
+                now = time.time()
+                redis_key = f"ratelimit:{key}"
+                member = f"{now}:{uuid.uuid4().hex[:8]}"
+                res = r.eval(_SLIDING_WINDOW_LUA, 1, redis_key, now, window_seconds, max_requests, member)
+                return bool(res == 1)
+            except Exception as exc:
+                from app.core.config import settings
+                is_prod = settings.ENVIRONMENT.lower() == "production"
+                # If production and security-sensitive auth endpoint, fail-closed policy
+                if is_prod and any(sec in key for sec in ["auth:", "login", "register", "forgot-password"]):
+                    logger.error(f"[RateLimiter] Redis error in production on security key '{key}': {exc}. Enforcing fail-closed.")
+                    return False
+                logger.warning(f"[RateLimiter] Redis error ({exc}); falling back to in-memory sliding window.")
+
+        # In-memory thread-safe sliding window fallback
         now = time.time()
         window_start = now - window_seconds
 
         with self._lock:
             timestamps = self.requests[key]
-            # Clean old requests
             active = [t for t in timestamps if t > window_start]
             self.requests[key] = active
 
@@ -54,8 +123,11 @@ class RateLimiter:
         return self.is_allowed(f"user:{user_id}", max_requests, window_seconds)
 
 
+# Backwards compatibility alias
+RateLimiter = DistributedRateLimiter
+
 # Global rate limiter instance
-_rate_limiter = RateLimiter()
+_rate_limiter = DistributedRateLimiter()
 limiter = _rate_limiter
 
 

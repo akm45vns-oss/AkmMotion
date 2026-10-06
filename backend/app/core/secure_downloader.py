@@ -89,6 +89,27 @@ def is_safe_url(url: str) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
+DEFAULT_ALLOWED_MEDIA_TYPES = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/x-matroska",
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/wave",
+    "audio/x-wav",
+    "audio/ogg",
+    "audio/aac",
+    "application/octet-stream",
+]
+
+
 async def secure_download_media(
     url: str,
     dest_path: Optional[str] = None,
@@ -99,16 +120,31 @@ async def secure_download_media(
 ) -> bytes:
     """
     Downloads external media safely:
-    - Pre-validates URL before initial fetch
-    - Explicitly inspects and validates every redirect location (follow_redirects=False)
-    - Validates response size with streaming chunk enforcement
-    - Optionally verifies content-type header
-    - Optionally saves to dest_path
+    - Pre-validates URL before initial fetch (blocking SSRF, private IPs, metadata)
+    - Validates scheme on all redirects (blocking file://, ftp://, gopher://)
+    - Detects and prevents redirect loops
+    - Explicitly inspects and validates every redirect hop with DNS re-verification
+    - Enforces granular connect, read, write, and pool timeouts
+    - Validates Content-Type header against permitted media types
+    - TRULY BOUNDED: streams response chunks (64KB) and aborts immediately when
+      incremental counter exceeds max_bytes, preventing OOM / memory exhaustion
+    - Safely cleans up partial files on disk if size limit or timeout is exceeded
     """
     current_url = url
     redirect_count = 0
+    visited_urls = {current_url}
 
-    async with httpx.AsyncClient(timeout=timeout_sec, follow_redirects=False) as client:
+    target_types = allowed_content_types if allowed_content_types is not None else DEFAULT_ALLOWED_MEDIA_TYPES
+
+    timeouts = httpx.Timeout(
+        timeout=timeout_sec,
+        connect=min(5.0, timeout_sec),
+        read=timeout_sec,
+        write=10.0,
+        pool=5.0
+    )
+
+    async with httpx.AsyncClient(timeout=timeouts, follow_redirects=False) as client:
         while True:
             # 1. SSRF Safety Check on current URL
             safe, err = is_safe_url(current_url)
@@ -116,12 +152,15 @@ async def secure_download_media(
                 raise SSRFSecurityError(f"SSRF violation for URL '{current_url}': {err}")
 
             try:
-                resp = await client.get(current_url)
+                # Use streaming request to avoid buffering response into memory
+                resp_ctx = client.stream("GET", current_url)
+                resp = await resp_ctx.__aenter__()
             except Exception as exc:
-                raise DownloadError(f"Network error downloading '{current_url}': {exc}")
+                raise DownloadError(f"Network error initiating download for '{current_url}': {exc}")
 
             # 2. Redirect Handling
             if resp.status_code in (301, 302, 303, 307, 308):
+                await resp_ctx.__aexit__(None, None, None)
                 redirect_count += 1
                 if redirect_count > max_redirects:
                     raise DownloadError(f"Too many redirects ({redirect_count}) for URL '{url}'")
@@ -133,6 +172,16 @@ async def secure_download_media(
                 # Resolve relative redirect URLs against current_url
                 next_url = urllib.parse.urljoin(current_url, location)
 
+                # Scheme validation: strictly block file://, ftp://, gopher://, etc.
+                next_scheme = urllib.parse.urlparse(next_url).scheme.lower()
+                if next_scheme not in ("http", "https"):
+                    raise SSRFSecurityError(f"Forbidden redirect scheme '{next_scheme}' in '{next_url}'")
+
+                # Detect redirect loops
+                if next_url in visited_urls:
+                    raise DownloadError(f"Redirect loop detected: '{next_url}' was visited multiple times.")
+                visited_urls.add(next_url)
+
                 # Validate next_url before following!
                 next_safe, next_err = is_safe_url(next_url)
                 if not next_safe:
@@ -143,27 +192,57 @@ async def secure_download_media(
 
             # 3. Check HTTP Status
             if resp.status_code != 200:
+                await resp_ctx.__aexit__(None, None, None)
                 raise DownloadError(f"HTTP {resp.status_code} error downloading '{current_url}'")
 
-            # 4. Content Type check if specified
-            if allowed_content_types:
-                ct = (resp.headers.get("Content-Type") or "").lower()
-                if not any(allowed in ct for allowed in allowed_content_types):
+            # 4. Content Type check
+            if target_types:
+                ct = (resp.headers.get("Content-Type") or "").lower().split(";")[0].strip()
+                if ct and not any(allowed in ct for allowed in target_types):
+                    await resp_ctx.__aexit__(None, None, None)
                     raise DownloadError(f"Unacceptable Content-Type '{ct}' for URL '{current_url}'")
 
             # 5. Check Content-Length if present
             cl = resp.headers.get("Content-Length")
             if cl and cl.isdigit() and int(cl) > max_bytes:
-                raise DownloadError(f"File size exceeds maximum allowed ({cl} > {max_bytes} bytes)")
+                await resp_ctx.__aexit__(None, None, None)
+                raise DownloadError(f"Content-Length exceeds maximum allowed ({cl} > {max_bytes} bytes)")
 
-            # 6. Read bytes with size cap
-            data = resp.content
-            if len(data) > max_bytes:
-                raise DownloadError(f"Downloaded content size {len(data)} exceeds maximum {max_bytes} bytes")
+            # 6. Stream chunks with hard byte counter enforcement
+            chunks = []
+            total_bytes = 0
+            file_handle = None
 
             if dest_path:
                 os.makedirs(os.path.dirname(os.path.abspath(dest_path)), exist_ok=True)
-                with open(dest_path, "wb") as f:
-                    f.write(data)
+                file_handle = open(dest_path, "wb")
 
-            return data
+            try:
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    total_bytes += len(chunk)
+                    if total_bytes > max_bytes:
+                        raise DownloadError(
+                            f"Downloaded content exceeded limit of {max_bytes} bytes "
+                            f"(aborted at {total_bytes} bytes)"
+                        )
+                    if file_handle:
+                        file_handle.write(chunk)
+                    else:
+                        chunks.append(chunk)
+            except Exception:
+                if file_handle:
+                    file_handle.close()
+                    file_handle = None
+                    if os.path.isfile(dest_path):
+                        try:
+                            os.remove(dest_path)
+                        except OSError:
+                            pass
+                raise
+            finally:
+                if file_handle:
+                    file_handle.close()
+                await resp_ctx.__aexit__(None, None, None)
+
+            return b"".join(chunks) if not dest_path else b""
+

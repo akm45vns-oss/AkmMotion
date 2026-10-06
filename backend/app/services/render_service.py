@@ -80,19 +80,58 @@ class RenderService:
         # Create new Render Job in DB (initially queued/pending)
         job = await self.repo.create_job(project_id=project_id, user_id=user_id, estimated_seconds=15)
 
-        # Dispatch via authoritative queue (Celery/Redis) with automatic fallback
+        # Dispatch via authoritative queue (Celery/Redis) with production enforcement
         from app.tasks.video_tasks import dispatch_render_job
-        dispatch_render_job(job.id, project_id, user_id, background_tasks)
+        mode, task_id = dispatch_render_job(job.id, project_id, user_id, background_tasks)
+        if task_id:
+            job.celery_task_id = task_id
+            await self.db.commit()
 
         updated_job = await self.repo.get_by_id(job.id)
         return RenderJobResponse.model_validate(updated_job or job)
 
     async def cancel_render_job(self, job_id: UUID, user_id: UUID) -> RenderJobResponse:
+        job = await self.repo.get_by_id(job_id)
+        if not job or job.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active render job not found.")
+
+        # Revoke Celery task if present
+        if getattr(job, "celery_task_id", None):
+            try:
+                from app.tasks.celery_app import celery_app
+                celery_app.control.revoke(job.celery_task_id, terminate=True, signal="SIGTERM")
+                logger.info(f"Revoked Celery task {job.celery_task_id} for job {job_id}")
+            except Exception as e:
+                logger.warning(f"Failed to revoke Celery task {job.celery_task_id}: {e}")
+
         cancelled = await self.repo.cancel_job(job_id, user_id)
         if not cancelled:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active render job not found.")
         return RenderJobResponse.model_validate(cancelled)
 
+    @classmethod
+    async def recover_stale_jobs(cls, stale_seconds: int = 900) -> int:
+        """
+        Sweeps stale render jobs that have been in pending/processing without progress
+        for longer than stale_seconds, marking them failed to release system capacity.
+        Returns the count of recovered jobs.
+        """
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)
+        async with AsyncSessionLocal() as session:
+            stmt = select(RenderJob).where(
+                RenderJob.status.in_([RenderStatus.pending, RenderStatus.processing]),
+                RenderJob.updated_at < cutoff
+            )
+            result = await session.execute(stmt)
+            stale_jobs = list(result.scalars().all())
+            for j in stale_jobs:
+                logger.warning(f"Recovering stale render job {j.id} (last updated: {j.updated_at})")
+                j.status = RenderStatus.failed
+                j.error_message = "Render timed out or worker process was terminated."
+            if stale_jobs:
+                await session.commit()
+            return len(stale_jobs)
 
     async def execute_render(self, job_id: UUID, project_id: UUID, user_id: UUID):
         """Direct execution wrapper for backward-compatibility."""

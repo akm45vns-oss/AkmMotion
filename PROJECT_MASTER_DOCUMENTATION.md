@@ -171,11 +171,11 @@ The video generation workflow converts raw natural text into a studio-grade MP4 
 - **Audio Caching & Fallbacks:**
   - MD5 hashing of text + voice ID enables 0ms cached replays.
   - Multi-tiered fallback: Edge-TTS $\rightarrow$ OpenAI TTS $\rightarrow$ gTTS $\rightarrow$ Synthesized 0.5s silent MP3 frame (preventing Web Audio API decode crashes).
-- **Word-Level Subtitle Synchronization:**
-  - Computes millisecond start and end boundaries (`start_ms`, `end_ms`) for each word using a syllable-weighted speech pacing model.
-  - Generates timed Advanced SubStation Alpha (`.ass`) subtitle files with 1080×1920 layout and yellow active word styling.
-  - *Note on Implementation:* Acoustic phoneme forced-alignment (e.g. via WhisperX or Gentle) is **NOT IMPLEMENTED**; current production timing is calculated via syllable-weighted heuristic estimation.
-  - Used for real-time karaoke highlight animations on the frontend preview and ASS subtitle filter burning.
+- **Word-Level Subtitle Synchronization (Dual-Mode):**
+  - **Canonical Timing Schema:** Strict schema requiring `word`, `start_ms`, `end_ms`, optional `confidence`, and `timing_source` (`"acoustic"` or `"heuristic"`). Timings are validated via `validate_word_timings` to enforce non-negative boundaries, monotonic ordering, and audio duration tolerances.
+  - **Acoustic Phoneme Alignment:** Enabled when `TIMING_MODE=acoustic` (via Whisper API in `align_audio_acoustically`), producing real acoustic word-level boundaries directly from generated speech.
+  - **Syllable-Weighted Heuristic Pacing:** Used when `TIMING_MODE=heuristic` or as graceful fallback if acoustic alignment fails. Supports both Latin and Devanagari/Hindi (`\u0900-\u097F`) character sets with syllable phoneme weighting.
+  - **Active Karaoke Subtitles:** Generates timed Advanced SubStation Alpha (`.ass`) subtitle files with 1080×1920 layout and active word highlight tags (`{\c&H00FFFF&\b1}WORD{\r}`). Timings are also synchronized in real time in the frontend player via HTML5 audio `ontimeupdate` events.
 
 ### 4.4 Visual Generation & Face Consistency Engine
 - **Flux-Realism (Pollinations AI):**
@@ -207,15 +207,21 @@ The video generation workflow converts raw natural text into a studio-grade MP4 
   - Desktop: 3-pane layout (Player, Inspector, Timeline).
   - Mobile (< lg screens): Segmented workspace toggle (Player, Inspector, Timeline) with 44px touch targets.
 
-### 4.6 Server-Side Native FFmpeg Render Engine
+### 4.6 Server-Side Native FFmpeg Render Engine & Durable Queue
+- **Execution Architecture (Celery + Redis vs BackgroundTasks):**
+  - **Production Mode:** Enforces `RENDER_EXECUTION_MODE=celery` with Redis broker (`CELERY_BROKER_URL`). Dispatches renders as durable background tasks (`video_tasks.render_video_task`), returning the Celery task ID and persisting the `RenderJob` record across API restarts and deployments. Startup validator fails fast if `celery` is configured without a broker or if `ENVIRONMENT=production` attempts to use `background`.
+  - **Development Mode:** Allows `RENDER_EXECUTION_MODE=background` via FastAPI `BackgroundTasks` for lightweight zero-dependency local testing.
+  - **Job Lifecycle & State Machine:** Persistent database states (`queued` $\rightarrow$ `running` $\rightarrow$ `completed` / `failed` / `cancelled`).
+  - **Stale Job Sweeper:** Automated recovery via `RenderService.recover_stale_jobs(stale_seconds=900)` identifies jobs stuck in `running` past the heartbeat threshold and marks them `failed`.
+  - **Cancellation & Worker Cleanup:** `POST /api/v1/render/cancel/{job_id}` invokes `celery_app.control.revoke(job.celery_task_id, terminate=True, signal="SIGTERM")` to abort running FFmpeg child processes cleanly and delete temp files.
 - **FFmpeg Discovery:**
   - Automatically identifies system `ffmpeg`, user-configured `FFMPEG_PATH`, or fallback `imageio-ffmpeg` binary.
 - **Segment Processing Pipeline:**
-  1. Image / Video Asset Preparation: Fetches image/video from URL via SSRF-safe downloader, verifies dimensions, or synthesizes high-contrast dark card if missing.
+  1. Image / Video Asset Preparation: Fetches image/video from URL via SSRF-safe streaming downloader, verifies dimensions, or synthesizes high-contrast dark card if missing.
   2. Audio Track Synthesis: Downloads audio or generates Edge-TTS speech with silence fallback.
   3. Ken Burns Filter Execution: Computes exact zoompan expressions for `push`, `zoom_out`, `pan_left`, `pan_right`, and subtle pulse.
   4. Audio/Video Duration Synchronization: Uses `-af apad` and exact `-t {duration:.2f}` clipping (removing legacy `-shortest`) to prevent visual or audio truncation.
-  5. Subtitle Burning: Renders ASS timed subtitles via `ass` filter with `drawtext` fallback at the bottom-third of the vertical screen.
+  5. Subtitle Burning: Renders ASS timed subtitles via `ass` filter with `drawtext` fallback at the bottom-third of the vertical screen, highlighting active words.
   6. Multi-Scene Transitions & Stitching: Renders smooth transitions (`fade`, `slide`, `wipe`, `zoom`) via FFmpeg `xfade` and audio `acrossfade`, automatically falling back to concat demuxer if transitions are disabled or unavailable.
 - **Stream Serving:**
   - Completed videos are streamed via `/api/v1/render/video/{job_id}` supporting HTTP Range headers (`206 Partial Content`) for seeking.
@@ -242,6 +248,12 @@ The video generation workflow converts raw natural text into a studio-grade MP4 
   - Session security watcher prompts re-authentication after prolonged idle periods.
 
 ### 4.9 Security, SSRF Guard & IDOR Defense
+- **Secure Streaming Media Downloader (`secure_downloader.py`):**
+  - Streams HTTP responses incrementally in 64 KB chunks rather than buffering into memory.
+  - Immediate byte counter abort: terminates download immediately once `max_bytes` is exceeded, cleaning up partial disk files.
+  - Content-Type enforcement: validates against an allowed media whitelist (`image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `audio/mpeg`, etc.).
+  - Hop-by-hop SSRF validation: validates every redirect destination IP before following.
+  - Redirect loop protection and forbidden scheme blocking (`file://`, `ftp://`, `gopher://` rejected with `SSRFSecurityError`).
 - **SSRF-Guarded Image Proxy (`/api/v1/ai/image-proxy`):**
   - Hardened against Server-Side Request Forgery.
   - Strict domain allowlist (`pollinations.ai`, `unsplash.com`).
@@ -251,8 +263,10 @@ The video generation workflow converts raw natural text into a studio-grade MP4 
 - **Insecure Direct Object Reference (IDOR) Protection:**
   - Every project, scene, character, render job, and video endpoint validates that `resource.user_id == current_user_id`.
   - Path traversal checks ensure video download requests cannot escape `storage/videos/`.
-- **Rate Limiting:**
-  - In-memory sliding-window rate limiters on AI generation, TTS, render dispatch, and image proxying.
+- **Distributed Rate Limiting (`DistributedRateLimiter`):**
+  - Redis-backed atomic sliding-window rate limiter powered by Lua scripts (`ZREMRANGEBYSCORE`, `ZCARD`, `ZADD`, `EXPIRE`).
+  - Fail-closed security policy in production for sensitive authentication endpoints (`/auth/login`, `/auth/register`) if Redis is unavailable.
+  - Graceful in-memory sliding-window fallback for local development environments.
 - **Exception Sanitization:**
   - In production (`ENVIRONMENT=production`), unhandled internal errors return sanitized generic error messages, preventing stack trace or database credential leaks.
 
@@ -636,16 +650,19 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 | Variable | Type | Default | Description |
 |---|---|---|---|
-| `ENVIRONMENT` | string | `development` | `development` or `production` (enforces HSTS and secure cookies) |
+| `ENVIRONMENT` | string | `development` | `development` or `production` (enforces HSTS, secure cookies, and mandatory Celery) |
 | `DEBUG` | boolean | `True` | Enables debug logging and interactive error pages |
+| `RENDER_EXECUTION_MODE` | string | `background` | `celery` (mandatory in production) or `background` (allowed in dev) |
+| `CELERY_BROKER_URL` | string | `""` | Redis broker URI (`redis://...`) for durable Celery render queue |
+| `TIMING_MODE` | string | `heuristic` | Subtitle timing mode: `acoustic` (Whisper API alignment) or `heuristic` (syllable pacing) |
 | `DATABASE_URL` | string | Neon pooler URI | Asynchronous PostgreSQL connection string (`postgresql+asyncpg://...`) |
 | `SYNC_DATABASE_URL` | string | Neon pooler URI | Synchronous PostgreSQL connection string (`postgresql://...`) |
-| `JWT_SECRET` | string | secret | Cryptographic secret for signing JWT access and refresh tokens |
+| `JWT_SECRET` | string | secret | Cryptographic secret for signing JWT access and refresh tokens (≥ 32 chars) |
 | `JWT_ACCESS_EXPIRE_MINUTES` | int | `15` | Access token lifespan in minutes |
 | `JWT_REFRESH_EXPIRE_DAYS` | int | `7` | Refresh token lifespan in days |
 | `GROQ_API_KEY` | string | `""` | Primary Groq API key for Llama 3 scene generation |
 | `GROQ_API_KEY_2` to `_5` | string | `""` | Secondary failover keys for round-robin rotation |
-| `OPENAI_API_KEY` | string | `""` | Optional fallback for GPT-3.5 and DALL-E 3 |
+| `OPENAI_API_KEY` | string | `""` | Key for acoustic word alignment and fallback TTS/GPT-3.5 |
 | `REPLICATE_API_TOKEN` | string | `""` | Optional token for PuLID FaceID visual consistency |
 | `FAL_KEY` | string | `""` | Optional API key for Fal.ai Kling text-to-video generation |
 | `STORAGE_DIR` | string | `""` | Path to persistent volume storage directory |
@@ -661,22 +678,36 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 The codebase maintains strict quality thresholds with automated regression testing:
 
-### Backend Test Coverage (26/26 Tests Passing)
-- **`tests/test_security.py` (15/15 Passed):**
-  - Guest isolation: verifies session cookies cannot read foreign projects.
-  - IDOR ownership validation: ensures users cannot delete or update another user's scenes or renders.
-  - SSRF protection: validates that private IP addresses (`127.0.0.1`, `10.0.0.0/8`, `192.168.0.0/16`) and unauthorized domains are rejected by the image proxy.
-  - Rate limiting verification: checks rejection after burst limits.
+### Backend Test Coverage (64 Tests Passing)
+- **`tests/test_production_auth_e2e.py` (18/18 Passed):**
+  - Authentication & Bcrypt hashing: registration, login, and rejection of invalid credentials.
+  - Startup secret validator: prevents startup if production lacks secrets or uses `background` mode.
+  - FFmpeg path escaping: Windows backward slash escaping for filter graphs (`ass`, `drawtext`).
+  - SSRF protection: private IP rejection, metadata blocking (`169.254.169.254`), and loopback blocking.
+  - Streaming Downloader: incremental 64 KB chunk downloads, instant abort on exceeding `max_bytes`, content-type enforcement, redirect loops, and scheme validation (`file://`, `ftp://`).
+  - Production Celery Queue: mandatory Celery mode in production, stale job recovery, task cancellation revocation.
+  - Distributed Rate Limiter: atomic Lua script Redis rate limiting with fail-closed security policy.
+  - Word Timing Validation: strict schema checks (`start_ms`, `end_ms`, monotonic ordering, tolerance).
+  - Real Video Rendering: builds real 1080×1920 MP4 with burning ASS karaoke word-by-word subtitles and ffprobe stream verification.
+  - HTTP Range 206: partial content streaming for video seek support.
+- **`tests/test_security_attacks.py` (11/11 Passed):**
+  - JWT none algorithm, tampering, expiration, password exclusion, metadata SSRF, and SQL injection defenses.
+- **`tests/test_script_fidelity.py` (6/6 Passed):**
+  - Script fidelity invariant and word preservation verification.
+- **`tests/test_proxy_security.py` (10/10 Passed):**
+  - Image proxy domain allowlist, IP blocking, and CORS header validation.
+- **`tests/test_provider_resilience.py` (5/5 Passed):**
+  - Groq key rotation, fallback TTS, and provider failure handling.
+- **`tests/test_storage_service.py` (5/5 Passed):**
+  - Path traversal defense and media storage validation.
+- **`tests/test_metrics_observability.py` (3/3 Passed):**
+  - Prometheus metrics counters and health endpoints.
 - **`tests/test_api.py` (6/6 Passed):**
-  - User registration, login, JWT validation, project creation, scene query, and health check validation.
-- **`tests/test_render_pipeline.py` (5/5 Passed):**
-  - Real server FFmpeg video compilation.
-  - Multi-scene ffprobe validation checking 1080×1920 resolution, H.264 video codec, AAC audio codec, and duration accuracy.
-  - Error recovery, concurrency limits, and stale render job cleanups.
+  - Core API endpoints (auth, projects, scenes, health).
 
 ### Frontend Verification
 - TypeScript verification: `npx tsc --noEmit` $\rightarrow$ **0 errors**.
-- Next.js production build: `npm run build` $\rightarrow$ **12 static and dynamic routes compiled cleanly**.
+- Next.js production build: `npm run build` $\rightarrow$ **13 static and dynamic routes compiled cleanly**.
 
 ---
 *End of AkmMotion Master Documentation — Generated 2026-10-04*

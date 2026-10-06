@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
     CELERY_TASK_ALWAYS_EAGER: bool = False
     CELERY_WORKER_CONCURRENCY: int = 2
+    # Render Execution Mode: 'background' (dev) or 'celery' (prod mandatory)
+    RENDER_EXECUTION_MODE: str = "background"
 
     # Capacity Controls & Concurrency Limits
     MAX_CONCURRENT_RENDERS_GLOBAL: int = 5
@@ -62,6 +64,9 @@ class Settings(BaseSettings):
     MAX_RENDER_DURATION_SECONDS: int = 600
     MAX_SIMULTANEOUS_AI_GENERATIONS: int = 3
     RENDER_TIMEOUT_SECONDS: int = 600
+
+    # Subtitle Timing Mode: 'heuristic' (default) or 'acoustic'
+    TIMING_MODE: str = "heuristic"
 
     # Storage Settings
     LOCAL_STORAGE: bool = True
@@ -129,10 +134,21 @@ class Settings(BaseSettings):
             errors.append("JWT_SECRET is not set. Generate with: python -c \"import secrets; print(secrets.token_urlsafe(48))\"")
         elif len(self.JWT_SECRET) < 32:
             errors.append(f"JWT_SECRET is too short ({len(self.JWT_SECRET)} chars). Minimum 32 characters required.")
+        if self.ENVIRONMENT.lower() == "production":
+            if self.RENDER_EXECUTION_MODE.lower() != "celery":
+                errors.append(
+                    f"RENDER_EXECUTION_MODE must be set to 'celery' in production (got '{self.RENDER_EXECUTION_MODE}'). "
+                    "BackgroundTasks in-process execution is strictly forbidden in production."
+                )
+            if not self.CELERY_BROKER_URL or "CHANGE_ME" in self.CELERY_BROKER_URL:
+                errors.append("CELERY_BROKER_URL must be configured with a valid broker URL in production.")
+            if self.CELERY_TASK_ALWAYS_EAGER:
+                errors.append("CELERY_TASK_ALWAYS_EAGER cannot be enabled in production.")
+
         if errors:
             raise RuntimeError(
-                "[AkmMotion] FATAL: Required secrets are missing or insecure.\n" +
-                "\n".join(f"  ✗ {e}" for e in errors)
+                "[AkmMotion] FATAL: Required secrets or production settings are missing or insecure.\n" +
+                "\n".join(f"  [!] {e}" for e in errors)
             )
 
     model_config = SettingsConfigDict(

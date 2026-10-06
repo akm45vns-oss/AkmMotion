@@ -87,34 +87,58 @@ def dispatch_render_job(
     project_id: UUID,
     user_id: UUID,
     background_tasks: Optional[BackgroundTasks] = None
-) -> str:
+) -> tuple[str, Optional[str]]:
     """
-    Dispatches a render job to Celery queue if broker is reachable.
-    Gracefully falls back to async background execution if Celery broker is offline or in local dev.
-    Returns the dispatch mechanism ('celery' or 'background_task').
+    Dispatches a render job to the Celery queue.
+    In production mode (ENVIRONMENT='production' or RENDER_EXECUTION_MODE='celery'):
+      Celery is MANDATORY. If Celery broker is unreachable or task dispatch fails,
+      raises RuntimeError immediately. Silent fallback to in-process BackgroundTasks is prohibited.
+    In development mode:
+      Tries Celery first if broker is reachable; gracefully falls back to BackgroundTasks.
+    Returns (dispatch_mode, celery_task_id).
     """
     from app.core.config import settings
-    
-    if not settings.CELERY_TASK_ALWAYS_EAGER:
+
+    is_production = settings.ENVIRONMENT.lower() == "production"
+    is_celery_forced = settings.RENDER_EXECUTION_MODE.lower() == "celery"
+
+    # Production path: Celery is mandatory
+    if is_production or is_celery_forced:
+        try:
+            task = render_video_task.apply_async(
+                args=[str(job_id), str(project_id), str(user_id)]
+            )
+            logger.info(f"[Production] Dispatched render job {job_id} to Celery queue (task ID: {task.id})")
+            return "celery", str(task.id)
+        except Exception as exc:
+            logger.critical(f"[Production] Celery render dispatch failed for job {job_id}: {exc}")
+            raise RuntimeError(
+                f"Production render dispatch failed: Celery broker is unreachable or failed to enqueue ({exc}). "
+                "In-process background rendering is strictly prohibited in production."
+            )
+
+    # Development path: attempt Celery if configured, fallback to in-process BackgroundTasks
+    if not settings.CELERY_TASK_ALWAYS_EAGER and settings.CELERY_BROKER_URL:
         try:
             import socket
             from urllib.parse import urlparse
             parsed = urlparse(settings.CELERY_BROKER_URL)
             host = parsed.hostname or "127.0.0.1"
             port = parsed.port or 6379
-            with socket.create_connection((host, port), timeout=0.1):
+            with socket.create_connection((host, port), timeout=0.15):
                 pass
 
             task = render_video_task.apply_async(
                 args=[str(job_id), str(project_id), str(user_id)]
             )
-            logger.info(f"Dispatched render job {job_id} to Celery queue (task ID: {task.id})")
-            return "celery"
+            logger.info(f"[Dev] Dispatched render job {job_id} to Celery queue (task ID: {task.id})")
+            return "celery", str(task.id)
         except Exception as exc:
-            logger.warning(f"Celery broker unavailable ({exc}); falling back to in-process background task.")
+            logger.warning(f"[Dev] Celery broker unreachable ({exc}); using in-process background execution for local development.")
 
     if background_tasks is not None:
         background_tasks.add_task(RenderService.execute_render_background, job_id, project_id, user_id)
     else:
         asyncio.create_task(RenderService.execute_render_background(job_id, project_id, user_id))
-    return "background_task"
+    return "background_task", None
+
